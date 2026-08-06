@@ -337,5 +337,39 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
   <script src="assets/js/config.js"></script>
   <script src="assets/js/app.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const quizList = [
+        { question: "【クイズ】宮城県の名物「ずんだ」の原料は何？\n1: えだまめ\n2: そらまめ", answer: "1" },
+        { question: "【クイズ】仙台藩の初代藩主はだれ？\n1: 伊達政宗\n2: 織田信長", answer: "1" },
+        { question: "【クイズ】日本で一番高い山は？\n1: 富士山\n2: 北岳", answer: "1" }
+      ];
+
+      // 1回目のクイズが終わったかを管理する変数
+      let hasAnsweredQuiz = false;
+
+      // 「送る」ボタンを取得
+      const submitBtn = document.getElementById('btn-submit-photo');
+      if (submitBtn) {
+        submitBtn.addEventListener('click', () => {
+          // まだクイズを出していない（最初の1回）場合のみ実行
+          if (!hasAnsweredQuiz) {
+            hasAnsweredQuiz = true;
+
+            // 写真の送信完了ダイアログ等が出た後にクイズを表示するため、少し時間をずらす（1秒後）
+            setTimeout(() => {
+              const randomQuiz = quizList[Math.floor(Math.random() * quizList.length)];
+              const userAnswer = prompt(randomQuiz.question);
+              if (userAnswer === randomQuiz.answer) {
+                alert("🎉 正解！ボーナス獲得！");
+              } else if (userAnswer !== null) {
+                alert("❌ 不正解…！");
+              }
+            }, 1000);
+          }
+        });
+      }
+    });
+  </script>
 </body>
 </html>
