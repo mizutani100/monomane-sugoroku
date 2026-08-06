@@ -12,3 +12,8 @@ database_id = "fbeeacff-ea22-4605-ab98-d6ffdc0aa2f7"
 
 # ORS_API_KEY は Pages の環境変数 / `wrangler pages secret` で設定する（コードには置かない）。
 # ローカルでは .dev.vars に ORS_API_KEY=... を書けば読み込まれる。
+
+# Cloudflare Workers AI のバインディング。写真の「そっくり度」をビジョンモデルで採点する。
+# 追加設定・別APIキーは不要。Pages プロジェクト側で Workers AI を有効化しておくこと。
+[ai]
+binding = "AI"

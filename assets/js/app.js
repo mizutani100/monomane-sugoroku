@@ -14,6 +14,17 @@
     statue:     { label: "銅像・彫刻", emoji: "🗿", difficulty: 5, points: 50, pose: "作品の姿勢を安全に再現し、数秒だけ静止する。台座には登らない。" }
   });
 
+  // 絵文字リアクション（得点には影響しない「みんなで笑う」用。バックエンドの REACTION_EMOJIS と一致）
+  const REACTIONS = Object.freeze([
+    { emoji: "😆", label: "わらった" },
+    { emoji: "👏", label: "そっくり" },
+    { emoji: "😮", label: "びっくり" },
+    { emoji: "❤️", label: "すき" }
+  ]);
+  // 大賞の集計に使う絵文字
+  const AWARD_SOKKURI = "👏"; // そっくり大賞
+  const AWARD_NANIKORE = "😆"; // なにこれ大賞
+
   const state = {
     allSpots: [],
     center: null,
@@ -923,16 +934,23 @@
       if (marker) marker.classList.add("done");
 
       if (state.position >= state.route.length - 1) {
-        $("game-status").textContent = "ゴール！ みんなの採点を待ちましょう。";
+        $("game-status").textContent = "ゴール！ AIの採点結果を見てみよう。";
         pollState().then(showResult);
       } else {
-        $("game-status").textContent = "送信しました。みんなの採点を待ちながら次のサイコロへ。";
+        $("game-status").textContent = "送信しました。AIが採点しました。次のサイコロへ！";
         $("btn-arrival").disabled = true;
         $("btn-dice").disabled = false;
       }
       pollState();
       sfx.shutter();
-      toast("写真を送りました。点数はみんながつけます。");
+      // AIの判定結果を撮影直後に知らせる
+      if (typeof data.aiStars === "number") {
+        sfx.star();
+        const stars = "★".repeat(data.aiStars) + "☆".repeat(5 - data.aiStars);
+        toast(`🤖 AI判定：${stars}${data.aiPole ? "　⚡電柱+5" : ""}${data.aiComment ? "\n「" + data.aiComment + "」" : ""}`, 5000);
+      } else {
+        toast("写真を送りました。AIが採点します。");
+      }
     } catch (error) {
       toast(`送信できません：${error.message}`, 5000);
       button.disabled = false;
@@ -945,20 +963,39 @@
     const mine = state.photos.filter((photo) => photo.playerId === state.me?.playerId);
     $("result-summary").textContent = `${name}：総合 ${state.score}点 ／ 撮影 ${mine.length}枚`;
 
-    // 二部門表彰（部屋全体から）
-    const rated = state.photos.filter((photo) => photo.ratingCount > 0);
+    // 二部門表彰（部屋全体から）。みんなのリアクション最多で決める（得点には無関係）。
+    // リアクションが1つも無ければAIの星でフォールバックする。
+    const rx = (photo, emoji) => Number((photo.reactions || {})[emoji] || 0);
+    const photos = state.photos;
+    const totalReactions = photos.reduce(
+      (sum, p) => sum + Object.values(p.reactions || {}).reduce((a, b) => a + Number(b), 0), 0);
     const awards = $("awards");
     awards.replaceChildren();
-    if (rated.length >= 2) {
-      const best = rated.reduce((a, b) => (b.avgStars > a.avgStars ? b : a));
-      const worst = rated.reduce((a, b) => (b.avgStars < a.avgStars ? b : a));
-      [["🏆 そっくり大賞", best], ["🤔 なにこれ大賞", worst]].forEach(([title, photo]) => {
+    if (photos.length >= 2) {
+      let best, worst, bestCaption, worstCaption;
+      if (totalReactions > 0) {
+        // そっくり大賞=👏最多（同数はAIの星が高い方）、なにこれ大賞=😆最多（同数はAIの星が低い方）
+        best = photos.reduce((a, b) =>
+          (rx(b, AWARD_SOKKURI) > rx(a, AWARD_SOKKURI) ||
+           (rx(b, AWARD_SOKKURI) === rx(a, AWARD_SOKKURI) && (b.aiStars ?? 0) > (a.aiStars ?? 0))) ? b : a);
+        worst = photos.reduce((a, b) =>
+          (rx(b, AWARD_NANIKORE) > rx(a, AWARD_NANIKORE) ||
+           (rx(b, AWARD_NANIKORE) === rx(a, AWARD_NANIKORE) && (b.aiStars ?? 5) < (a.aiStars ?? 5))) ? b : a);
+        bestCaption = `${AWARD_SOKKURI}×${rx(best, AWARD_SOKKURI)}`;
+        worstCaption = `${AWARD_NANIKORE}×${rx(worst, AWARD_NANIKORE)}`;
+      } else {
+        best = photos.reduce((a, b) => ((b.aiStars ?? 0) > (a.aiStars ?? 0) ? b : a));
+        worst = photos.reduce((a, b) => ((b.aiStars ?? 5) < (a.aiStars ?? 5) ? b : a));
+        bestCaption = `★${best.aiStars ?? "-"}`;
+        worstCaption = `★${worst.aiStars ?? "-"}`;
+      }
+      [["🏆 そっくり大賞", best, bestCaption], ["🤔 なにこれ大賞", worst, worstCaption]].forEach(([title, photo, cap]) => {
         const box = document.createElement("div");
         box.className = "award";
         box.innerHTML =
           `<p class="award-title">${title}</p>` +
           `<img class="award-image" src="${photo.url}?t=${encodeURIComponent(state.me?.token || "")}" alt="">` +
-          `<p class="award-caption">${escapeHtml(photo.nickname)}／${escapeHtml(photo.spotName)}　★${photo.avgStars}</p>`;
+          `<p class="award-caption">${escapeHtml(photo.nickname)}／${escapeHtml(photo.spotName)}　${cap}</p>`;
         awards.append(box);
       });
     }
@@ -973,7 +1010,7 @@
       const caption = document.createElement("figcaption");
       const cat = CATEGORIES[photo.category];
       caption.textContent = `${cat ? cat.emoji : "📷"} ${photo.spotName}　${
-        photo.ratingCount ? `★${photo.avgStars}　${photo.points}点` : "採点待ち"}`;
+        photo.ratingCount ? `★${photo.avgStars}　${photo.points}点` : "AI判定中"}`;
       figure.append(image, caption);
       album.append(figure);
     });
@@ -1543,35 +1580,31 @@
     $("btn-dice").disabled = false;
   }
 
-  // ===== 採点フィード =====
+  // ===== AI判定フィード =====
   function renderJudgeFeed() {
     const feed = $("judge-feed");
     if (!feed) return;
     feed.replaceChildren();
 
-    const others = state.photos.filter((photo) => photo.playerId !== state.me?.playerId);
-    const pending = others.filter((photo) => !photo.ratedByMe);
-    const done = others.filter((photo) => photo.ratedByMe);
     const mine = state.photos.filter((photo) => photo.playerId === state.me?.playerId);
+    const others = state.photos.filter((photo) => photo.playerId !== state.me?.playerId);
+    const judging = state.photos.filter((photo) => photo.aiStatus === "pending");
 
+    // バッジは「AIが判定中」の枚数を表す
     const badge = $("judge-badge");
-    badge.textContent = String(pending.length);
-    badge.classList.toggle("hidden", pending.length === 0);
+    badge.textContent = String(judging.length);
+    badge.classList.toggle("hidden", judging.length === 0);
 
     $("judge-empty").classList.toggle("hidden", state.photos.length > 0);
     if (!state.photos.length) return;
 
-    if (pending.length) {
-      feed.append(sectionTitle(`採点待ち（${pending.length}）`));
-      pending.forEach((photo) => feed.append(photoCard(photo, true)));
-    }
     if (mine.length) {
       feed.append(sectionTitle("自分の写真"));
-      mine.forEach((photo) => feed.append(photoCard(photo, false)));
+      mine.forEach((photo) => feed.append(photoCard(photo)));
     }
-    if (done.length) {
-      feed.append(sectionTitle("採点済み"));
-      done.forEach((photo) => feed.append(photoCard(photo, false)));
+    if (others.length) {
+      feed.append(sectionTitle("みんなの写真"));
+      others.forEach((photo) => feed.append(photoCard(photo)));
     }
   }
 
@@ -1582,7 +1615,7 @@
     return heading;
   }
 
-  function photoCard(photo, ratable) {
+  function photoCard(photo) {
     const card = document.createElement("article");
     card.className = "photo-card";
 
@@ -1602,84 +1635,77 @@
       `<small>${escapeHtml(photo.icon || "🙂")} ${escapeHtml(photo.nickname)}　基礎点${photo.basePoints}</small></span>`;
     card.append(head);
 
-    if (ratable) {
-      const hint = document.createElement("p");
-      hint.className = "photo-card-hint";
-      hint.textContent = "似ているほど星を増やす";
-      card.append(hint);
-
-      const stars = document.createElement("div");
-      stars.className = "stars";
-      for (let value = 1; value <= 5; value += 1) {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.dataset.rating = String(value);
-        button.textContent = "★";
-        button.addEventListener("click", () => {
-          stars.querySelectorAll("button").forEach((other) => {
-            other.classList.toggle("on", Number(other.dataset.rating) <= value);
-          });
-          card.dataset.stars = String(value);
-          send.disabled = false;
-        });
-        stars.append(button);
-      }
-      card.append(stars);
-
-      const bonusLabel = document.createElement("label");
-      bonusLabel.className = "check-row";
-      const bonus = document.createElement("input");
-      bonus.type = "checkbox";
-      bonusLabel.append(bonus, document.createTextNode(" 電柱が写り込んだ（+5点）"));
-      card.append(bonusLabel);
-
-      const send = document.createElement("button");
-      send.className = "button primary";
-      send.type = "button";
-      send.textContent = "採点する";
-      send.disabled = true;
-      send.addEventListener("click", async () => {
-        send.disabled = true;
-        send.textContent = "送信中…";
-        try {
-          await api(`/photos/${photo.id}/ratings`, {
-            method: "POST",
-            body: { stars: Number(card.dataset.stars), poleBonus: bonus.checked }
-          });
-          sfx.star();
-          toast("採点しました。");
-          pollState();
-        } catch (error) {
-          toast(`採点できません：${error.message}`, 4500);
-          send.disabled = false;
-          send.textContent = "採点する";
-        }
-      });
-      card.append(send);
+    // AIの判定結果を表示する
+    const verdict = document.createElement("div");
+    verdict.className = "ai-verdict";
+    if (photo.aiStatus === "pending" || photo.aiStars === null || photo.aiStars === undefined) {
+      verdict.classList.add("judging");
+      verdict.innerHTML = `<span class="ai-badge">🤖 AI判定中…</span>`;
     } else {
-      const result = document.createElement("p");
-      result.className = "photo-card-result";
-      result.textContent = photo.ratingCount
-        ? `★${photo.avgStars}（${photo.ratingCount}人）　${photo.points}点${photo.poleBonus ? "　⚡+5" : ""}`
-        : "まだ採点されていません";
-      card.append(result);
-
-      if (photo.playerId === state.me?.playerId) {
-        const publish = document.createElement("button");
-        publish.className = photo.publishedId ? "text-button danger" : "text-button";
-        publish.type = "button";
-        publish.textContent = photo.publishedId ? "🌐 公開を取り下げる" : "🌐 ネットにも公開する";
-        publish.addEventListener("click", () => {
-          if (photo.publishedId) {
-            unpublishPhoto(photo.id);
-          } else {
-            toast("公開は撮影直後の画面から行えます。次回から送信時に選んでください。", 5000);
-          }
-        });
-        card.append(publish);
+      const filled = "★".repeat(photo.aiStars);
+      const empty = "☆".repeat(5 - photo.aiStars);
+      verdict.innerHTML =
+        `<span class="ai-badge">🤖 AI判定</span>` +
+        `<span class="ai-stars">${filled}<span class="ai-stars-empty">${empty}</span></span>` +
+        `<span class="ai-points">${photo.points}点${photo.poleBonus ? "　⚡電柱+5" : ""}</span>`;
+      if (photo.aiComment) {
+        verdict.innerHTML += `<p class="ai-comment">「${escapeHtml(photo.aiComment)}」</p>`;
       }
     }
+    card.append(verdict);
+
+    // 絵文字リアクション（得点には影響しない）。自分の写真は集計の読み取りだけ、他人の写真は押せる
+    const isMine = photo.playerId === state.me?.playerId;
+    card.append(reactionBar(photo, isMine));
+
+    if (isMine) {
+      const publish = document.createElement("button");
+      publish.className = photo.publishedId ? "text-button danger" : "text-button";
+      publish.type = "button";
+      publish.textContent = photo.publishedId ? "🌐 公開を取り下げる" : "🌐 ネットにも公開する";
+      publish.addEventListener("click", () => {
+        if (photo.publishedId) {
+          unpublishPhoto(photo.id);
+        } else {
+          toast("公開は撮影直後の画面から行えます。次回から送信時に選んでください。", 5000);
+        }
+      });
+      card.append(publish);
+    }
     return card;
+  }
+
+  function reactionBar(photo, readOnly) {
+    const bar = document.createElement("div");
+    bar.className = "reaction-bar";
+    const counts = photo.reactions || {};
+    REACTIONS.forEach(({ emoji, label }) => {
+      const n = Number(counts[emoji] || 0);
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "reaction-btn";
+      btn.title = label;
+      if (photo.myReaction === emoji) btn.classList.add("on");
+      if (readOnly) btn.classList.add("readonly");
+      btn.innerHTML = `<span class="reaction-emoji">${emoji}</span>` + (n > 0 ? `<span class="reaction-count">${n}</span>` : "");
+      if (!readOnly) {
+        btn.addEventListener("click", () => sendReaction(photo.id, emoji, btn));
+      } else {
+        btn.disabled = true;
+      }
+      bar.append(btn);
+    });
+    return bar;
+  }
+
+  async function sendReaction(photoId, emoji, btn) {
+    try {
+      await api(`/photos/${photoId}/reactions`, { method: "POST", body: { emoji } });
+      sfx.pop();
+      pollState();
+    } catch (error) {
+      toast(`リアクションできません：${error.message}`, 4000);
+    }
   }
 
   function renderRoomCard() {

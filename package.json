@@ -5,10 +5,14 @@
   "private": true,
   "license": "MIT",
   "scripts": {
-    "dev": "wrangler pages dev . --d1 DB=monomane-sugoroku",
-    "db:migrate:local": "wrangler d1 execute monomane-sugoroku --local --file=./migrations/0001_init.sql",
-    "db:migrate:remote": "wrangler d1 execute monomane-sugoroku --remote --file=./migrations/0001_init.sql",
-    "deploy": "wrangler pages deploy ."
+    "dev": "npx wrangler pages dev .",
+    "db:migrate:local": "npx wrangler d1 execute monomane-sugoroku --local --file=./migrations/0001_init.sql && npx wrangler d1 execute monomane-sugoroku --local --file=./migrations/0002_ai_judging.sql && npx wrangler d1 execute monomane-sugoroku --local --file=./migrations/0003_reactions.sql",
+    "db:migrate:remote": "npx wrangler d1 execute monomane-sugoroku --remote --file=./migrations/0001_init.sql && npx wrangler d1 execute monomane-sugoroku --remote --file=./migrations/0002_ai_judging.sql && npx wrangler d1 execute monomane-sugoroku --remote --file=./migrations/0003_reactions.sql",
+    "db:ai:local": "npx wrangler d1 execute monomane-sugoroku --local --file=./migrations/0002_ai_judging.sql",
+    "db:ai:remote": "npx wrangler d1 execute monomane-sugoroku --remote --file=./migrations/0002_ai_judging.sql",
+    "db:reactions:local": "npx wrangler d1 execute monomane-sugoroku --local --file=./migrations/0003_reactions.sql",
+    "db:reactions:remote": "npx wrangler d1 execute monomane-sugoroku --remote --file=./migrations/0003_reactions.sql",
+    "deploy": "npx wrangler pages deploy ."
   },
   "devDependencies": {
     "wrangler": "^4.0.0"

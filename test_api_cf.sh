@@ -96,30 +96,55 @@ UPLOAD=$(curl -s -X POST "$BASE/rooms/$CODE/photos" -H "X-Player-Token: $GUEST_T
 PHOTO_ID=$(echo "$UPLOAD" | J "['photoId']")
 ok "アップロードOK photoId=$PHOTO_ID"
 
-echo "== 仕様1: 自分の写真は自分で採点できない（403）"
-SELF=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE/photos/$PHOTO_ID/ratings" \
-  -H "X-Player-Token: $GUEST_TOKEN" -H "Content-Type: application/json" -d '{"stars":5}')
-assert_http 403 "$SELF" "自分の写真の自己採点を拒否"
+echo "== 仕様1: 人の相互採点は廃止（410）— 採点はAIが自動で行う"
+GONE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE/photos/$PHOTO_ID/ratings" \
+  -H "X-Player-Token: $HOST_TOKEN" -H "Content-Type: application/json" -d '{"stars":5}')
+assert_http 410 "$GONE" "相互採点エンドポイントの廃止"
 
-echo "== 仕様10: 星は1〜5の範囲外を拒否（400）"
-S6=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE/photos/$PHOTO_ID/ratings" \
-  -H "X-Player-Token: $HOST_TOKEN" -H "Content-Type: application/json" -d '{"stars":6}')
-assert_http 400 "$S6" "星6を拒否"
-S0=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE/photos/$PHOTO_ID/ratings" \
-  -H "X-Player-Token: $HOST_TOKEN" -H "Content-Type: application/json" -d '{"stars":0}')
-assert_http 400 "$S0" "星0を拒否"
+echo "== リアクション: 自分の写真には押せない（403）"
+RXSELF=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE/photos/$PHOTO_ID/reactions" \
+  -H "X-Player-Token: $GUEST_TOKEN" -H "Content-Type: application/json" -d '{"emoji":"👏"}')
+assert_http 403 "$RXSELF" "自分の写真への自己リアクションを拒否"
 
-echo "== 仕様2: 得点 = 基礎点 × 星平均(小数1位) + 電柱ボーナス(+5)"
-echo "  ホストが★4＋電柱ボーナスで採点 → 30 × 4 + 5 = 125点になるはず"
-curl -s -o /dev/null -X POST "$BASE/photos/$PHOTO_ID/ratings" -H "X-Player-Token: $HOST_TOKEN" \
-  -H "Content-Type: application/json" -d '{"stars":4,"poleBonus":true}'
+echo "== リアクション: 許可外の絵文字は拒否（400）"
+RXBAD=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE/photos/$PHOTO_ID/reactions" \
+  -H "X-Player-Token: $HOST_TOKEN" -H "Content-Type: application/json" -d '{"emoji":"💩"}')
+assert_http 400 "$RXBAD" "許可外絵文字を拒否"
+
+echo "== リアクション: ホストが👏 → stateに件数と自分の反応が出る・得点は変わらない"
+PTS_BEFORE=$(curl -s "$BASE/rooms/$CODE/state" -H "X-Player-Token: $GUEST_TOKEN" | J "['photos'][0]['points']")
+curl -s -o /dev/null -X POST "$BASE/photos/$PHOTO_ID/reactions" -H "X-Player-Token: $HOST_TOKEN" \
+  -H "Content-Type: application/json" -d '{"emoji":"👏"}'
+curl -s "$BASE/rooms/$CODE/state" -H "X-Player-Token: $HOST_TOKEN" | PTS_BEFORE="$PTS_BEFORE" python3 -c "
+import sys, json, os
+p = json.load(sys.stdin)['photos'][0]
+print(f\"    リアクション: {p['reactions']} / 自分の反応={p['myReaction']} / {p['points']}点\")
+assert p['reactions'].get('👏') == 1, f'👏件数が反映されていない: {p[\"reactions\"]}'
+assert p['myReaction'] == '👏', f'自分の反応が反映されていない: {p[\"myReaction\"]}'
+assert p['points'] == int(os.environ['PTS_BEFORE']), f'リアクションで得点が変わった: {p[\"points\"]}'
+" && ok "リアクション集計・得点非影響" || ng "リアクションの集計／得点非影響が不正"
+
+echo "== リアクション: 同じ👏をもう一度で取り消し（0件に戻る）"
+curl -s -o /dev/null -X POST "$BASE/photos/$PHOTO_ID/reactions" -H "X-Player-Token: $HOST_TOKEN" \
+  -H "Content-Type: application/json" -d '{"emoji":"👏"}'
+curl -s "$BASE/rooms/$CODE/state" -H "X-Player-Token: $HOST_TOKEN" | python3 -c "
+import sys, json
+p = json.load(sys.stdin)['photos'][0]
+assert p['reactions'].get('👏', 0) == 0, f'取り消しできていない: {p[\"reactions\"]}'
+assert p['myReaction'] is None
+" && ok "リアクションのトグル取り消し" || ng "リアクションの取り消しが不正"
+
+echo "== 仕様2: AIが写真をアップロード時に採点し、得点 = 基礎点 × 星 + 電柱ボーナス"
+echo "  （ローカルにAIバインディングが無い場合は星3のフォールバックで採点される）"
 curl -s "$BASE/rooms/$CODE/state" -H "X-Player-Token: $GUEST_TOKEN" | python3 -c "
 import sys, json
 p = json.load(sys.stdin)['photos'][0]
-print(f\"    写真: {p['spotName']} / 平均★{p['avgStars']} / {p['ratingCount']}人 / {p['points']}点 / 電柱{p['poleBonus']}\")
-assert p['points'] == 125, f'期待125点 実際{p[\"points\"]}点'
-assert p['poleBonus'] is True
-" && ok "得点計算 125点" || ng "得点計算が不正"
+print(f\"    写真: {p['spotName']} / AI状態={p['aiStatus']} / ★{p['aiStars']} / {p['points']}点 / 電柱{p['poleBonus']}\")
+assert p['aiStatus'] in ('done', 'failed'), f'AI判定が未実行: {p[\"aiStatus\"]}'
+assert p['aiStars'] is not None and 1 <= p['aiStars'] <= 5, f'星が不正: {p[\"aiStars\"]}'
+expected = p['basePoints'] * p['aiStars'] + (5 if p['poleBonus'] else 0)
+assert p['points'] == expected, f'得点式が不正: 期待{expected} 実際{p[\"points\"]}'
+" && ok "AI採点と得点計算" || ng "AI採点／得点計算が不正"
 
 echo "== 仕様6: 部屋の写真は部屋メンバーのみ（トークンなし403 / あり200）"
 NOAUTH=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/photos/$PHOTO_ID")
@@ -169,9 +194,10 @@ echo "== 仕様3: ネット投票は部屋の得点に一切影響しない"
 curl -s "$BASE/rooms/$CODE/state" -H "X-Player-Token: $GUEST_TOKEN" | python3 -c "
 import sys, json
 p = json.load(sys.stdin)['photos'][0]
-assert p['points'] == 125, f'ネット投票で部屋得点が変わった: {p[\"points\"]}'
+expected = p['basePoints'] * p['aiStars'] + (5 if p['poleBonus'] else 0)
+assert p['points'] == expected, f'ネット投票で部屋得点が変わった: {p[\"points\"]}'
 assert p['publishedId'] is not None, '公開状態が反映されていない'
-" && ok "部屋得点125点のまま・公開フラグあり" || ng "ネット投票が部屋得点に影響した"
+" && ok "部屋得点はAI採点のまま・公開フラグあり" || ng "ネット投票が部屋得点に影響した"
 
 echo "== 仕様5: 公開を取り下げると公開画像と投票が即座に削除される"
 curl -s -o /dev/null -X DELETE "$BASE/photos/$PHOTO_ID/publish" -H "X-Player-Token: $GUEST_TOKEN"

@@ -18,6 +18,66 @@ const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // 紛らわしい I/L/O/0/1 を除外
 const REPORT_HIDE_THRESHOLD = 3;
 
+// ===== AI判定（Cloudflare Workers AI ビジョン）=====
+// 写真の「そっくり度」をビジョンモデルで採点し、人の相互採点を置き換える。
+const AI_MODEL = '@cf/meta/llama-3.2-11b-vision-instruct';
+const AI_TIMEOUT_MS = 20000;
+// カテゴリ→日本語ラベル（プロンプト用。フロントの CATEGORIES と対応）
+const CATEGORY_LABELS = {
+  manhole: 'マンホール', tree: '街路樹', giant_tree: '巨樹・巨木', post: '郵便ポスト',
+  bus_stop: 'バス停', vending: '自動販売機', phone: '公衆電話', hydrant: '消火栓', statue: '銅像・彫刻',
+};
+
+// 絵文字リアクションの許可リスト（得点には影響しない。フロントの REACTIONS と一致させること）
+const REACTION_EMOJIS = ['😆', '👏', '😮', '❤️'];
+
+/** AIの返答テキストから {stars, pole, comment} を頑健に取り出す */
+function parseJudgement(text) {
+  const raw = String(text ?? '');
+  let obj = null;
+  const m = raw.match(/\{[\s\S]*\}/);
+  if (m) {
+    try { obj = JSON.parse(m[0]); } catch (e) { obj = null; }
+  }
+  let stars = obj && Number.isFinite(Number(obj.stars)) ? Math.round(Number(obj.stars)) : NaN;
+  if (!Number.isFinite(stars)) {
+    // JSONが壊れていたら本文から最初の1〜5の数字を拾う
+    const d = raw.match(/[1-5]/);
+    stars = d ? Number(d[0]) : 3;
+  }
+  stars = Math.min(5, Math.max(1, stars));
+  const pole = obj ? (obj.pole === true || obj.pole === 1 || obj.pole === 'true') : /電柱|でんちゅう|pole/i.test(raw);
+  let comment = obj && typeof obj.comment === 'string' ? obj.comment.trim() : '';
+  if (!comment) comment = 'AIが判定しました';
+  comment = [...comment].slice(0, 40).join('');
+  return { stars, pole: pole ? 1 : 0, comment };
+}
+
+/** 写真をAIビジョンで採点する。失敗時は例外を投げず、呼び出し側でフォールバックする */
+async function judgePhoto(env, bytes, spot) {
+  if (!env || !env.AI) {
+    throw new Error('AI binding 未設定');
+  }
+  const category = String(spot.category ?? '');
+  const label = CATEGORY_LABELS[category] || String(spot.name ?? 'まちのもの');
+  const prompt =
+    `あなたは「街のモノまねすごろく」という遊びの審査員です。` +
+    `写真に写っている人が「${label}」のモノマネ（そっくりなポーズ・見た目）をどれくらい上手にできているかを採点してください。\n` +
+    `次のJSONだけを1行で出力してください。説明文やコードブロックは書かないこと:\n` +
+    `{"stars":<1〜5の整数>,"pole":<電柱が写っていればtrue、なければfalse>,"comment":"<子ども向けの短くて楽しい日本語の講評。30文字以内>"}\n` +
+    `starsの目安 → 5:そっくり / 4:似ている / 3:まあまあ / 2:あと一歩 / 1:あまり似ていない。`;
+  const run = env.AI.run(AI_MODEL, {
+    prompt,
+    image: [...bytes],
+    max_tokens: 200,
+    temperature: 0.3,
+  });
+  const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('AI応答がタイムアウトしました')), AI_TIMEOUT_MS));
+  const res = await Promise.race([run, timeout]);
+  const text = typeof res === 'string' ? res : (res && (res.response ?? res.description ?? res.text)) || '';
+  return parseJudgement(text);
+}
+
 // exit相当。fail()でthrowし、onRequestのcatchでJSON応答に変換する
 class HttpError extends Error {
   constructor(status, message) {
@@ -230,10 +290,8 @@ async function roomState(db, room, viewerId = null) {
   const rowsRes = await db
     .prepare(
       `SELECT p.id, p.player_id, p.spot_index, p.spot_name, p.category, p.base_points, p.created_at,
+              p.ai_stars, p.ai_pole, p.ai_comment, p.ai_status,
               pl.nickname, pl.icon,
-              (SELECT COUNT(*) FROM ratings r WHERE r.photo_id = p.id) AS rating_count,
-              (SELECT AVG(r.stars) FROM ratings r WHERE r.photo_id = p.id) AS avg_stars,
-              (SELECT MAX(r.pole_bonus) FROM ratings r WHERE r.photo_id = p.id) AS pole_bonus,
               (SELECT pub.id FROM published_photos pub WHERE pub.photo_id = p.id) AS published_id
        FROM photos p JOIN players pl ON pl.id = p.player_id
        WHERE p.room_id = ? ORDER BY p.created_at`
@@ -242,24 +300,41 @@ async function roomState(db, room, viewerId = null) {
     .all();
   const rows = rowsRes.results;
 
-  const myRated = {};
+  // 絵文字リアクション集計（得点には一切影響しない）。写真ごとの emoji→件数 と、閲覧者自身の反応
+  const reactionByPhoto = {};
+  const myReaction = {};
+  const rxRes = await db
+    .prepare(
+      `SELECT r.photo_id, r.emoji, COUNT(*) AS c
+       FROM reactions r JOIN photos p ON p.id = r.photo_id
+       WHERE p.room_id = ? GROUP BY r.photo_id, r.emoji`
+    )
+    .bind(room.id)
+    .all();
+  for (const r of rxRes.results) {
+    const pid = Number(r.photo_id);
+    (reactionByPhoto[pid] ??= {})[r.emoji] = Number(r.c);
+  }
   if (viewerId !== null) {
-    const r2 = await db
-      .prepare('SELECT photo_id FROM ratings WHERE rater_player_id = ?')
-      .bind(viewerId)
+    const mineRx = await db
+      .prepare(
+        `SELECT r.photo_id, r.emoji FROM reactions r JOIN photos p ON p.id = r.photo_id
+         WHERE p.room_id = ? AND r.player_id = ?`
+      )
+      .bind(room.id, viewerId)
       .all();
-    for (const r of r2.results) {
-      myRated[Number(r.photo_id)] = true;
+    for (const r of mineRx.results) {
+      myReaction[Number(r.photo_id)] = r.emoji;
     }
   }
 
   const scoreByPlayer = {};
   const photos = [];
   for (const row of rows) {
-    const count = Number(row.rating_count);
-    const avg = count > 0 ? Math.round(Number(row.avg_stars) * 10) / 10 : null;
-    const bonus = count > 0 ? (Number(row.pole_bonus) > 0 ? 5 : 0) : 0;
-    const points = avg !== null ? Math.round(Number(row.base_points) * avg) + bonus : 0;
+    // AIが採点した星（1〜5）を得点にする。未判定(NULL)は0点扱いで、判定完了後に反映される
+    const stars = row.ai_stars !== null && row.ai_stars !== undefined ? Number(row.ai_stars) : null;
+    const bonus = Number(row.ai_pole) > 0 ? 5 : 0;
+    const points = stars !== null ? Math.round(Number(row.base_points) * stars) + bonus : 0;
     const pid = Number(row.player_id);
     scoreByPlayer[pid] = (scoreByPlayer[pid] ?? 0) + points;
     photos.push({
@@ -272,11 +347,16 @@ async function roomState(db, room, viewerId = null) {
       category: row.category,
       basePoints: Number(row.base_points),
       url: 'api/photos/' + Number(row.id),
-      ratingCount: count,
-      avgStars: avg,
+      aiStatus: row.ai_status || 'pending',
+      aiStars: stars,
+      aiComment: row.ai_comment || null,
+      // 既存フロント互換: avgStars=AIの星, poleBonus=電柱, ratingCount=判定済みなら1
+      avgStars: stars,
       poleBonus: bonus > 0,
+      ratingCount: stars !== null ? 1 : 0,
       points: points,
-      ratedByMe: !!myRated[Number(row.id)],
+      reactions: reactionByPhoto[Number(row.id)] ?? {},
+      myReaction: myReaction[Number(row.id)] ?? null,
       publishedId: row.published_id !== null ? Number(row.published_id) : null,
       createdAt: row.created_at,
     });
@@ -482,7 +562,28 @@ export async function onRequest(context) {
             nowIso()
           )
           .run();
-        return json({ ok: true, photoId: Number(res.meta.last_row_id) }, 201);
+        const photoId = Number(res.meta.last_row_id);
+
+        // AIビジョンで即採点する。失敗しても写真は保存済みなので、星3のフォールバックで続行する
+        let judged;
+        try {
+          judged = await judgePhoto(env, bytes, spot);
+          await db
+            .prepare('UPDATE photos SET ai_stars = ?, ai_pole = ?, ai_comment = ?, ai_status = ? WHERE id = ?')
+            .bind(judged.stars, judged.pole, judged.comment, 'done', photoId)
+            .run();
+        } catch (aiError) {
+          console.error('AI判定に失敗:', aiError && aiError.stack ? aiError.stack : aiError);
+          judged = { stars: 3, pole: 0, comment: 'AIの判定が間に合いませんでした' };
+          await db
+            .prepare('UPDATE photos SET ai_stars = ?, ai_pole = ?, ai_comment = ?, ai_status = ? WHERE id = ?')
+            .bind(judged.stars, judged.pole, judged.comment, 'failed', photoId)
+            .run();
+        }
+        return json(
+          { ok: true, photoId, aiStars: judged.stars, aiPole: !!judged.pole, aiComment: judged.comment },
+          201
+        );
       }
 
       // POST /rooms/{code}/progress
@@ -709,8 +810,9 @@ export async function onRequest(context) {
       });
     }
 
-    // POST /photos/{id}/ratings … 相互採点
-    if (method === 'POST' && segments.length === 3 && segments[0] === 'photos' && segments[2] === 'ratings') {
+    // POST /photos/{id}/reactions … 絵文字リアクション（得点に影響しない）
+    // 1人1写真1つ。同じ絵文字を再送で取り消し、別の絵文字で差し替え
+    if (method === 'POST' && segments.length === 3 && segments[0] === 'photos' && segments[2] === 'reactions') {
       const photo = await db.prepare('SELECT * FROM photos WHERE id = ?').bind(parseInt(segments[1], 10) || 0).first();
       if (photo === null) {
         fail(404, '写真が見つかりません');
@@ -718,24 +820,39 @@ export async function onRequest(context) {
       const room = await db.prepare('SELECT * FROM rooms WHERE id = ?').bind(photo.room_id).first();
       const player = await authPlayer(db, request, room);
       if (Number(player.id) === Number(photo.player_id)) {
-        fail(403, '自分の写真は採点できません');
+        fail(403, '自分の写真にはリアクションできません');
       }
       const body = await readJsonBody(request);
-      const stars = parseInt(body.stars ?? 0, 10) || 0;
-      if (stars < 1 || stars > 5) {
-        fail(400, '星は1〜5で指定してください');
+      const emoji = String(body.emoji ?? '');
+      if (!REACTION_EMOJIS.includes(emoji)) {
+        fail(400, '使えない絵文字です');
       }
-      const bonus = body.poleBonus ? 1 : 0;
-      await db
-        .prepare(
-          `INSERT INTO ratings(photo_id, rater_player_id, stars, pole_bonus, created_at)
-           VALUES(?, ?, ?, ?, ?)
-           ON CONFLICT(photo_id, rater_player_id)
-           DO UPDATE SET stars = excluded.stars, pole_bonus = excluded.pole_bonus`
-        )
-        .bind(photo.id, player.id, stars, bonus, nowIso())
-        .run();
-      return json({ ok: true });
+      const existing = await db
+        .prepare('SELECT emoji FROM reactions WHERE photo_id = ? AND player_id = ?')
+        .bind(photo.id, player.id)
+        .first();
+      let active;
+      if (existing && existing.emoji === emoji) {
+        // 同じ絵文字をもう一度 → 取り消し
+        await db.prepare('DELETE FROM reactions WHERE photo_id = ? AND player_id = ?').bind(photo.id, player.id).run();
+        active = null;
+      } else {
+        await db
+          .prepare(
+            `INSERT INTO reactions(photo_id, player_id, emoji, created_at)
+             VALUES(?, ?, ?, ?)
+             ON CONFLICT(photo_id, player_id) DO UPDATE SET emoji = excluded.emoji, created_at = excluded.created_at`
+          )
+          .bind(photo.id, player.id, emoji, nowIso())
+          .run();
+        active = emoji;
+      }
+      return json({ ok: true, myReaction: active });
+    }
+
+    // POST /photos/{id}/ratings … 旧・相互採点。AI判定へ移行したため廃止
+    if (method === 'POST' && segments.length === 3 && segments[0] === 'photos' && segments[2] === 'ratings') {
+      fail(410, '相互採点は廃止されました（写真はAIが採点し、人は絵文字リアクションを送れます）');
     }
 
     fail(404, 'エンドポイントが見つかりません');

@@ -29,16 +29,16 @@
       <div class="view-scroll">
         <h2 class="view-title">採点</h2>
         <div class="segmented" role="tablist">
-          <button id="seg-room" class="segmented-item active" type="button">部屋</button>
+          <button id="seg-room" class="segmented-item active" type="button">🤖 AI採点</button>
           <button id="seg-net" class="segmented-item" type="button">🌐 ネット採点</button>
         </div>
         <div id="net-gallery" class="judge-feed hidden"></div>
         <div id="scoreboard" class="scoreboard"></div>
         <div id="judge-feed" class="judge-feed"></div>
         <div id="judge-empty" class="empty-state">
-          <p class="empty-emoji">🌟</p>
-          <p>まだ採点できる写真がありません</p>
-          <p class="fine-print">みんなが写真を撮るとここに並びます（P3で実装）</p>
+          <p class="empty-emoji">🤖</p>
+          <p>まだ写真がありません</p>
+          <p class="fine-print">写真を撮るとAIが自動で採点してここに並びます</p>
         </div>
       </div>
     </section>
@@ -276,7 +276,7 @@
             <input type="radio" name="destination" value="room" checked>
             <span class="destination-body">
               <strong>🏠 部屋のみんなに送る</strong>
-              <small>同行メンバーだけが見て採点します（30日で自動削除）</small>
+              <small>AIが自動で採点します。同行メンバーも見られます（30日で自動削除）</small>
             </span>
           </label>
           <label class="destination">
