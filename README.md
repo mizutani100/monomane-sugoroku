@@ -36,15 +36,16 @@
 
 ## 使用データ（すべてオープンデータ）
 
-同梱の `data/spots.geojson` は仙台市を対象とした6,012地点。
+同梱の `data/spots.geojson` は仙台市を対象とした6,655地点。
 
 | データ | 件数 | 出典 | ライセンス |
 |---|---|---|---|
 | バス停 | 1,078 | 仙台市営バス GTFS-JP | 配布元の利用条件に従う |
 | 消火栓 | 4,860 | 仙台市オープンデータ「消火栓」 | CC BY 4.0 |
+| 郵便ポスト | 643 | OpenStreetMap contributors | ODbL 1.0 |
 | 彫刻 | 74 | 仙台市オープンデータ「彫刻」 | CC BY 4.0 |
 
-前処理として、同名バス停を1地点に統合（2,149乗り場 → 1,078名称）、密集する消火栓を150m間隔で間引き（15,308 → 4,860）を行っている。
+前処理として、同名バス停を1地点に統合（2,149乗り場 → 1,078名称）、密集する消火栓を150m間隔で間引き（15,308 → 4,860）を行っている。郵便ポストは OpenStreetMap の Overpass API から取得し、密集回避のため100m間隔で間引いた（660 → 643）。取得・変換は `tools/add_postboxes.py`。
 
 - 背景地図: [CARTO Voyager](https://carto.com/attributions)（© OpenStreetMap contributors / © CARTO）
 - 徒歩経路: [openrouteservice](https://openrouteservice.org/)（OSMベース）
