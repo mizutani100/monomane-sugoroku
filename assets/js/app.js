@@ -1187,8 +1187,11 @@
     state.room = { code: payload.room.code, status: payload.room.status };
     state.peers = (payload.players || []).filter((p) => p.id !== state.me?.playerId);
 
+    // 盤面生成パネルを開いて操作中は、ポーリングで盤面を組み直して勝手に表示しない
+    // （「盤面を作り直す」直後などにコマが振り出しで再表示されるのを防ぐ）
+    const inSetup = !$("setup-panel").classList.contains("hidden");
     let boardRebuilt = false;
-    if (isNewBoard && payload.room.board?.spots) {
+    if (isNewBoard && payload.room.board?.spots && !inSetup) {
       const route = spotsToRoute(payload.room.board.spots);
       if (route.length) {
         const center = payload.room.board.center;
