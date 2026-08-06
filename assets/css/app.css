@@ -550,7 +550,8 @@ body { background: #05010f; }
   letter-spacing:.3px; border:1px solid rgba(255,255,255,.35);
   transition: transform .12s ease, box-shadow .2s ease, filter .2s ease;
 }
-.button::after {
+/* 光沢スイープは「主役ボタン」だけ（優先度メリハリ）: サイコロ・カメラ・primary */
+.button.primary::after, .button.dice::after, #btn-open-camera::after {
   content:""; position:absolute; inset:0;
   background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,.55) 50%, transparent 80%);
   background-size: 250% 100%;
@@ -558,13 +559,17 @@ body { background: #05010f; }
 }
 .button:hover { transform: translateY(-2px) scale(1.03); filter: brightness(1.1); }
 .button:active { transform: scale(.96); }
+/* 主役：やること（送る・生成・到着判定・参加など）は派手に光る */
 .button.primary {
   background: linear-gradient(135deg,#00e5ff,#2b7bff,#8a2be2);
   box-shadow: 0 0 16px rgba(43,123,255,.75), 0 8px 20px rgba(138,43,226,.5);
 }
+/* 脇役：アルバム・絵文字デコ等は落ち着いた単色（主役より目立たせない） */
 .button.secondary {
-  background: linear-gradient(135deg,#ff4ecd,#a64bff);
-  box-shadow: 0 0 15px rgba(255,78,205,.7);
+  background: #2b2450;
+  color:#e9e4ff;
+  border-color: rgba(255,255,255,.16);
+  box-shadow: 0 2px 8px rgba(0,0,0,.35);
 }
 /* カメラで撮影＝目立つ暖色系（メイン導線） */
 #btn-open-camera {
@@ -582,10 +587,10 @@ body { background: #05010f; }
   background: linear-gradient(135deg,#14b8c4,#3a5bd6) !important; color:#fff !important;
   box-shadow: 0 0 12px rgba(20,184,196,.55) !important;
 }
-/* その他のファイル選択ラベル（GeoJSON追加など）は寒色の控えめ配色 */
+/* GeoJSON追加などのユーティリティは主張を最小限に */
 label.button.file-button {
-  background: linear-gradient(135deg,#14b8c4,#3a5bd6) !important; color:#fff !important;
-  box-shadow: 0 0 12px rgba(20,184,196,.5) !important;
+  background: #2b2450 !important; color:#e9e4ff !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,.3) !important;
 }
 /* サイコロボタン：燃える虹＋点滅グロー */
 .button.dice {
@@ -594,14 +599,15 @@ label.button.file-button {
   animation: bg-pan 3s linear infinite, dice-glow 1.4s ease-in-out infinite;
 }
 
-/* 丸ボタン・チップ */
+/* 道具ボタン・チップ＝ユーティリティは控えめ（主役を邪魔しない） */
 .round-button {
-  background: linear-gradient(135deg,#ff008c,#8a2be2); color:#fff;
-  box-shadow: 0 0 14px rgba(255,0,140,.7), 0 4px 12px rgba(0,0,0,.4);
+  background: rgba(18,5,38,.9); color:#fff;
+  border: 1px solid rgba(255,255,255,.22);
+  box-shadow: 0 2px 10px rgba(0,0,0,.4);
 }
 .mini-chip {
-  background: linear-gradient(135deg,#00e5ff,#8a2be2); color:#fff;
-  box-shadow: 0 0 12px rgba(0,229,255,.7);
+  background: rgba(255,255,255,.14); color:#eae2ff;
+  box-shadow: none;
 }
 
 /* 下部パネル：ダーク＋ネオン枠 */
@@ -619,13 +625,11 @@ label.button.file-button {
 .bottom-panel .status-text, .bottom-panel .fine-print { color:#cdbff0 !important; }
 .panel-grip::before { background: linear-gradient(90deg,#ff008c,#00e5ff); }
 
-/* カード：虹枠＋グロー */
+/* カード：情報・ユーティリティ枠は控えめに（主役ボタンを引き立てる） */
 .card {
-  border: 1.6px solid transparent;
-  background:
-    linear-gradient(#fff,#fff) padding-box,
-    linear-gradient(135deg,#ff008c,#00e5ff,#ffe000) border-box;
-  box-shadow: 0 0 20px rgba(255,0,140,.28), 0 6px 18px rgba(0,0,0,.35);
+  border: 1px solid rgba(255,255,255,.14);
+  background: #fff;
+  box-shadow: 0 4px 14px rgba(0,0,0,.28);
 }
 .card h3 {
   background: linear-gradient(90deg,#ff008c,#8a2be2,#00e5ff);

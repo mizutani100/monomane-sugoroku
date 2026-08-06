@@ -137,6 +137,73 @@
     };
   })();
 
+  /** BGMエンジン（Web Audioで合成するループ。外部音源不要・著作権フリー・オフライン可） */
+  const bgm = (() => {
+    let ctx = null, master = null, timer = null, step = 0, playing = false;
+    // I-V-vi-IV（C・G・Am・F）の王道進行。ベース＋アルペジオを軽やかに鳴らす
+    const BASS = [130.81, 196.00, 220.00, 174.61];            // C3 G3 A3 F3
+    const CHORDS = [
+      [523.25, 659.25, 783.99],  // C5 E5 G5
+      [493.88, 587.33, 783.99],  // B4 D5 G5
+      [523.25, 659.25, 880.00],  // C5 E5 A5
+      [523.25, 698.46, 880.00],  // C5 F5 A5
+    ];
+    const bpm = 104, beatMs = 60000 / bpm / 2; // 8分音符
+    const ensure = () => {
+      if (!ctx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return null;
+        try { ctx = new AC(); } catch { return null; }
+        master = ctx.createGain();
+        master.gain.value = 0.05; // 控えめな音量
+        master.connect(ctx.destination);
+      }
+      if (ctx.state === "suspended") ctx.resume().catch(() => {});
+      return ctx;
+    };
+    function note(freq, dur, type, gain) {
+      const t = ctx.currentTime;
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = type;
+      o.frequency.value = freq;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(gain, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g).connect(master);
+      o.start(t);
+      o.stop(t + dur + 0.03);
+    }
+    function tick() {
+      const bar = Math.floor(step / 8) % 4;
+      const inBar = step % 8;
+      if (inBar % 4 === 0) note(BASS[bar], beatMs / 1000 * 1.8, "triangle", 0.5);
+      const chord = CHORDS[bar];
+      note(chord[inBar % chord.length], beatMs / 1000 * 0.9, "sine", 0.32);
+      step = (step + 1) % 32;
+    }
+    return {
+      isPlaying: () => playing,
+      start() {
+        if (playing || !ensure()) return false;
+        step = 0;
+        tick();
+        timer = setInterval(tick, beatMs);
+        playing = true;
+        localStorage.setItem("monomaneBgm", "1");
+        return true;
+      },
+      stop() {
+        if (timer) clearInterval(timer);
+        timer = null;
+        playing = false;
+        localStorage.setItem("monomaneBgm", "0");
+      },
+      toggle() { if (playing) { this.stop(); } else { this.start(); } return playing; },
+      wanted: () => localStorage.getItem("monomaneBgm") === "1"
+    };
+  })();
+
   function showDialog(dialog) {
     if (!dialog.open) dialog.showModal();
   }
@@ -1221,10 +1288,21 @@
     toast(muted ? "効果音をオフにしました。" : "効果音をオンにしました。", 1600);
   });
 
-  // すべてのボタン押下に共通のクリック効果音（キャプチャ段階で拾う）
+  // BGMのオン／オフ
+  const updateBgmIcon = () => { $("btn-bgm").style.opacity = bgm.isPlaying() ? "1" : ".5"; };
+  updateBgmIcon();
+  $("btn-bgm").addEventListener("click", () => {
+    bgm.toggle();
+    updateBgmIcon();
+    toast(bgm.isPlaying() ? "BGMを再生します。" : "BGMを止めました。", 1600);
+  });
+
+  // すべてのボタン押下に共通のクリック効果音（キャプチャ段階で拾う）。
+  // 併せて、前回BGMをオンにしていたら最初の操作でBGMを復帰させる（自動再生制限の回避）。
   document.addEventListener("click", (event) => {
     const button = event.target.closest("button");
     if (button && !button.disabled && button.id !== "btn-sound") sfx.tick();
+    if (bgm.wanted() && !bgm.isPlaying()) { bgm.start(); updateBgmIcon(); }
   }, true);
   $("btn-close-sources").addEventListener("click", () => closeDialog($("sources-dialog")));
 
@@ -2137,6 +2215,27 @@
       toast(`部屋コード：${code}`);
     }
   });
+  // 招待リンク：部屋コード入りURLを共有／コピー（開くと参加コードが自動で入る）
+  $("btn-invite").addEventListener("click", async () => {
+    const code = String(state.room?.code || "").trim().toUpperCase();
+    if (!/^[A-Z2-9]{6}$/.test(code)) {
+      toast("有効な部屋がありません。");
+      return;
+    }
+    const link = `${location.origin}${location.pathname}?join=${code}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "街のモノまねすごろく", text: `部屋 ${code} に参加してね！`, url: link });
+        return;
+      } catch (error) {
+        if (error && error.name === "AbortError") return;
+      }
+    }
+    const copied = copyViaExecCommand(link);
+    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(link).catch(() => {});
+    toast(copied ? "招待リンクをコピーしました。" : link, 4500);
+  });
+
   $("btn-open-sources").addEventListener("click", () => showDialog($("sources-dialog")));
   $("btn-open-safety").addEventListener("click", () => showDialog($("safety-dialog")));
 
@@ -2183,6 +2282,18 @@
   loadProfile();
   switchTab("map");
   restoreSession();
+
+  // 招待リンク（?join=CODE）で開いたら参加コードを自動入力し、参加画面へ誘導する
+  const joinParam = new URLSearchParams(location.search).get("join");
+  if (joinParam && /^[A-Z2-9]{6}$/i.test(joinParam)) {
+    const code = joinParam.toUpperCase();
+    $("join-code").value = code;
+    if (!localStorage.getItem("monomaneSession")) {
+      switchTab("profile");
+      toast(`招待コード ${code} が入りました。ニックネームを決めて「参加する」を押してください。`, 5500);
+    }
+    history.replaceState(null, "", location.pathname); // URLからコードを消して共有事故を防ぐ
+  }
 
   updateRadiusLabel(Number($("radius-range").value));
   setCenter(L.latLng(CONFIG.initialCenter[0], CONFIG.initialCenter[1]));
