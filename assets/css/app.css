@@ -566,9 +566,26 @@ body { background: #05010f; }
   background: linear-gradient(135deg,#ff4ecd,#a64bff);
   box-shadow: 0 0 15px rgba(255,78,205,.7);
 }
-.camera-button, label.button {
-  background: linear-gradient(135deg,#00e5ff,#2b7bff,#8a2be2) !important; color:#fff !important;
-  box-shadow: 0 0 16px rgba(43,123,255,.7);
+/* カメラで撮影＝目立つ暖色系（メイン導線） */
+#btn-open-camera {
+  display: grid; place-items: center; width: 100%;
+  background: linear-gradient(135deg,#ff008c,#ff5e00,#ffd000) !important;
+  background-size: 180% 180% !important;
+  color:#fff !important;
+  border: 2px solid rgba(255,255,255,.65) !important;
+  box-shadow: 0 0 24px rgba(255,94,0,.9), 0 8px 22px rgba(255,0,140,.55) !important;
+  font-size: 16px; min-height: 54px; font-weight: 900;
+  animation: bg-pan 4s linear infinite;
+}
+/* 写真を選ぶ＝控えめな寒色系（サブ導線） */
+.camera-button {
+  background: linear-gradient(135deg,#14b8c4,#3a5bd6) !important; color:#fff !important;
+  box-shadow: 0 0 12px rgba(20,184,196,.55) !important;
+}
+/* その他のファイル選択ラベル（GeoJSON追加など）は寒色の控えめ配色 */
+label.button.file-button {
+  background: linear-gradient(135deg,#14b8c4,#3a5bd6) !important; color:#fff !important;
+  box-shadow: 0 0 12px rgba(20,184,196,.5) !important;
 }
 /* サイコロボタン：燃える虹＋点滅グロー */
 .button.dice {
