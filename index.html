@@ -53,7 +53,7 @@
     </div>
 
     <section id="no-room-panel" class="bottom-panel" aria-labelledby="no-room-title">
-      <div class="panel-grip" aria-hidden="true"></div>
+      <button class="panel-grip" type="button" aria-label="パネルの折りたたみ／展開" aria-expanded="true"></button>
       <div class="panel-heading">
         <div>
           <h2 id="no-room-title">まだ旅が始まっていません</h2>
@@ -66,7 +66,7 @@
     </section>
 
     <section id="setup-panel" class="bottom-panel hidden" aria-labelledby="setup-title">
-      <div class="panel-grip" aria-hidden="true"></div>
+      <button class="panel-grip" type="button" aria-label="パネルの折りたたみ／展開" aria-expanded="true"></button>
       <div class="panel-heading">
         <div>
           <h2 id="setup-title">遊ぶ場所を決める</h2>
@@ -100,11 +100,11 @@
         <button id="btn-generate" class="button primary" type="button" disabled>盤面を生成</button>
       </div>
 
-      <p class="fine-print">同名バス停は1地点だけ採用し、探索半径を広げるほど目標マス間距離も長くなります。位置情報と写真はサーバへ送信しません。</p>
+      <p class="fine-print">同名バス停は1地点だけ採用し、探索半径を広げるほど目標マス間距離も長くなります。写真は部屋のメンバーだけが見られます（30日で自動削除）。GPSの座標は端末内で判定し、サーバには送りません。</p>
     </section>
 
     <section id="game-panel" class="bottom-panel hidden" aria-labelledby="game-title">
-      <div class="panel-grip" aria-hidden="true"></div>
+      <button class="panel-grip" type="button" aria-label="パネルの折りたたみ／展開" aria-expanded="true"></button>
       <div class="panel-heading">
         <div>
           <h2 id="game-title">すごろく進行</h2>
@@ -158,6 +158,10 @@
           <h3>参加中の部屋</h3>
           <p class="room-code-display">部屋コード <strong id="room-code-text">------</strong></p>
           <div id="member-list" class="member-list"></div>
+          <div class="button-row">
+            <button id="btn-make-album" class="button secondary" type="button">🖼️ アルバムを作る</button>
+          </div>
+          <p id="album-hint" class="fine-print hidden">写真を撮ると、自分の写真でアルバム画像を作れます。</p>
           <div class="button-row compact-row">
             <button id="btn-copy-code" class="text-button" type="button">コードをコピー</button>
             <button id="btn-leave-room" class="text-button danger" type="button">部屋を出る</button>

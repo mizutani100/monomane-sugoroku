@@ -1,0 +1,14 @@
+name = "monomane-sugoroku"
+compatibility_date = "2024-11-01"
+pages_build_output_dir = "."
+
+# D1 データベースのバインディング。
+# 事前に `npx wrangler d1 create monomane-sugoroku` で作成し、
+# 出力された database_id を下に貼る（ローカル `pages dev` では database_id は不要）。
+[[d1_databases]]
+binding = "DB"
+database_name = "monomane-sugoroku"
+database_id = "fbeeacff-ea22-4605-ab98-d6ffdc0aa2f7"
+
+# ORS_API_KEY は Pages の環境変数 / `wrangler pages secret` で設定する（コードには置かない）。
+# ローカルでは .dev.vars に ORS_API_KEY=... を書けば読み込まれる。

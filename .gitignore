@@ -1,8 +1,18 @@
 # === 絶対に公開してはいけないもの ===
-api/secrets.php          # openrouteserviceのAPIキー
-api/data/app.sqlite*     # 部屋・採点データ（SQLite）
-api/data/photos/         # 参加者の写真
-api/data/public/         # ネット公開用の写真
+# openrouteserviceのAPIキー
+api/secrets.php
+# 部屋・採点データ（SQLite）
+api/data/app.sqlite*
+# 参加者の写真
+api/data/photos/
+# ネット公開用の写真
+api/data/public/
+
+# === Cloudflare / wrangler ===
+# ローカルD1・キャッシュの状態
+.wrangler/
+# ローカルの環境変数（ORS_API_KEY等）
+.dev.vars
 
 # === 環境依存・一時ファイル ===
 .DS_Store

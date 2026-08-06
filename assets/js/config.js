@@ -17,6 +17,6 @@ window.MONOMANE_CONFIG = Object.freeze({
   mapTiles: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
   mapSubdomains: "abcd",
   mapAttribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>',
-  // 徒歩経路はサーバのプロキシ経由で取得する（APIキーはapi/secrets.phpに置きブラウザへ出さない）
+  // 徒歩経路はサーバのプロキシ経由で取得する（APIキーはサーバ側の環境変数ORS_API_KEYに置きブラウザへ出さない）
   routeProxyUrl: "api/route"
 });

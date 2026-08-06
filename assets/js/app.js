@@ -197,6 +197,21 @@
     }).addTo(map);
   }
 
+  /** 中心円の全体が、下部パネルに隠れない領域に収まるよう地図を調整する */
+  function fitCenterCircle() {
+    if (!state.centerCircle) return;
+    if ($("setup-panel").classList.contains("hidden")) return;
+    const bounds = state.centerCircle.getBounds();
+    if (!bounds.isValid()) return;
+    const panel = $("setup-panel");
+    const panelHeight = panel.offsetHeight || 0;
+    map.fitBounds(bounds, {
+      paddingTopLeft: [24, 24],
+      paddingBottomRight: [24, panelHeight + 24], // パネルの高さぶんを下に確保
+      animate: true
+    });
+  }
+
   function currentPosition(options = {}) {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
@@ -403,7 +418,7 @@
       }
     } catch (error) {
       console.warn("経路APIに接続できませんでした。直線距離表示を継続します。", error);
-      if (state.position < 0) $("game-status").textContent += "（直線距離表示。道のり表示はapi/secrets.phpにORSキーを設定）";
+      if (state.position < 0) $("game-status").textContent += "（直線距離表示。道のり表示にはORSキーの設定が必要です）";
     }
   }
 
@@ -540,17 +555,60 @@
     });
   }
 
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  function prefersReducedMotion() {
+    return window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+
+  /** 通過するマスを一瞬だけ強調（スケールアップ→戻す） */
+  function hopMarker(index) {
+    const el = document.querySelector(`#route-marker-${index}`);
+    if (!el) return;
+    el.classList.remove("hop");
+    void el.offsetWidth; // アニメーションを確実に再生するためリフローを挟む
+    el.classList.add("hop");
+    setTimeout(() => el.classList.remove("hop"), 340);
+  }
+
+  /** コマ（現在地マーカー）をルート上に1マスずつ進める */
+  async function animatePieceTo(from, to, roll) {
+    for (let i = from + 1; i <= to; i += 1) {
+      state.position = i;
+      markRouteProgress();
+      hopMarker(i);
+      const spot = state.route[i];
+      map.panTo([spot.lat, spot.lon], { animate: true, duration: 0.3 });
+      const remaining = to - i;
+      $("game-status").textContent = remaining > 0
+        ? `🎲 ${roll}！ コマが進んでいます…あと${remaining}マス`
+        : `🎲 ${roll}！ ${to + 1}マス目に到着！`;
+      await sleep(350);
+    }
+  }
+
   async function rollDice() {
     if (!state.route.length || rollDice.rolling) return;
     rollDice.rolling = true;
     $("btn-dice").disabled = true;
+    $("btn-arrival").disabled = true; // アニメーション中の二重操作を防ぐ
     const roll = Math.floor(Math.random() * 6) + 1;
     await playDiceAnimation(roll);
-    rollDice.rolling = false;
-    const next = Math.min(state.position + roll, state.route.length - 1);
+
     const from = state.position;
-    state.position = next;
+    // ゴールを超える出目はゴールで止まる（既存仕様）
+    const to = Math.min(state.position + roll, state.route.length - 1);
     state.targetReached = false;
+
+    if (prefersReducedMotion() || to <= from) {
+      // 動きを控える設定、または移動なしのときは即座に反映する
+      state.position = to;
+      markRouteProgress();
+    } else {
+      await animatePieceTo(from, to, roll);
+      await sleep(400); // 最後のマスに着いたら少し間を置いてから目的地カードを出す
+    }
+    state.position = to;
     markRouteProgress();
 
     const target = state.route[state.position];
@@ -576,6 +634,7 @@
     $("btn-arrival").disabled = false;
     map.setView([target.lat, target.lon], Math.max(map.getZoom(), 17));
     reportProgress();
+    rollDice.rolling = false;
   }
 
   async function checkArrival() {
@@ -636,8 +695,8 @@
     showDialog($("mission-dialog"));
   }
 
-  /** 端末側で長辺1280pxへ縮小してからアップロードする */
-  async function shrinkImage(file, maxEdge = 1280, quality = 0.82) {
+  /** 端末側で長辺1000pxへ縮小してからアップロードする（D1のBLOB保存に収まるよう1枚150〜250KB想定） */
+  async function shrinkImage(file, maxEdge = 1000, quality = 0.75) {
     const bitmap = await createImageBitmap(file);
     const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
     const canvas = document.createElement("canvas");
@@ -885,10 +944,26 @@
     $("radius-label").textContent = `${radiusKm.toFixed(1)} km（目標マス間 約${formatDistance(target)}）`;
   }
 
+  // input（ドラッグ中）は円の再描画だけ。毎フレームのfitBoundsは重いので避ける。
   $("radius-range").addEventListener("input", (event) => {
     updateRadiusLabel(Number(event.target.value));
     drawCenterCircle();
     updateCandidateCount();
+  });
+  // change（指を離した時）に円全体が見える位置・ズームへ地図を合わせる。
+  $("radius-range").addEventListener("change", fitCenterCircle);
+
+  // グリップのタップでパネルを折りたたみ／展開する
+  document.querySelectorAll(".panel-grip").forEach((grip) => {
+    const toggle = () => {
+      const panel = grip.closest(".bottom-panel");
+      if (!panel) return;
+      const collapsed = panel.classList.toggle("collapsed");
+      grip.setAttribute("aria-expanded", collapsed ? "false" : "true");
+      // 折りたたみ/展開でパネル高さが変わるので、中心円の収まりを取り直す
+      if (panel.id === "setup-panel") setTimeout(fitCenterCircle, 60);
+    };
+    grip.addEventListener("click", toggle); // <button>なのでEnter/Spaceは自動でclickになる
   });
 
   $("btn-current-location").addEventListener("click", async () => {
@@ -1267,6 +1342,15 @@
     $("create-card").classList.toggle("hidden", hasRoom);
     if (!hasRoom) return;
     $("room-code-text").textContent = state.room.code;
+
+    // アルバム作成ボタン：自分の写真が1枚以上あるときだけ有効化する
+    const myPhotos = state.photos.filter((photo) => photo.playerId === state.me?.playerId);
+    const albumBtn = $("btn-make-album");
+    if (albumBtn) {
+      const canMake = myPhotos.length > 0;
+      albumBtn.disabled = !canMake;
+      $("album-hint").classList.toggle("hidden", canMake);
+    }
     const list = $("member-list");
     list.replaceChildren();
     const all = [...state.peers];
@@ -1699,13 +1783,66 @@
   });
   $("btn-join-room").addEventListener("click", joinRoom);
   $("btn-leave-room").addEventListener("click", leaveRoom);
-  $("btn-copy-code").addEventListener("click", async () => {
-    if (!state.room) return;
+  // プロフィールタブから、あとでも自分の写真でアルバムPNGを作れる（部屋がfinishedでも可）
+  $("btn-make-album").addEventListener("click", async () => {
+    const myPhotos = state.photos.filter((photo) => photo.playerId === state.me?.playerId);
+    if (!state.room || !myPhotos.length) {
+      toast("まだアルバムを作れる写真がありません。");
+      return;
+    }
+    const button = $("btn-make-album");
+    button.disabled = true;
+    const original = button.textContent;
+    button.textContent = "作成中…";
     try {
-      await navigator.clipboard.writeText(state.room.code);
-      toast("部屋コードをコピーしました。");
+      await downloadAlbum();
+      toast("アルバム画像を保存しました。");
+    } catch (error) {
+      toast(`アルバムを作れません：${error.message}`, 4500);
+    } finally {
+      button.textContent = original;
+      button.disabled = false;
+    }
+  });
+  /** 一時inputを使ったコピー（iOS Safariでもクリックの同期パスで確実に書き込む） */
+  function copyViaExecCommand(text) {
+    const input = document.createElement("input");
+    input.value = text;
+    input.setAttribute("readonly", "");
+    input.style.position = "fixed";
+    input.style.top = "-1000px";
+    input.style.opacity = "0";
+    document.body.append(input);
+    input.select();
+    input.setSelectionRange(0, text.length);
+    let ok = false;
+    try {
+      ok = document.execCommand("copy");
     } catch {
-      toast(`部屋コード：${state.room.code}`);
+      ok = false;
+    }
+    input.remove();
+    return ok;
+  }
+
+  // クリックの同期パス内でコピーする（awaitを挟むとiOS Safariが拒否するため非async）。
+  // 直前に /^[A-Z2-9]{6}$/ で検証し、成功トーストには実際にコピーした文字列を出す。
+  $("btn-copy-code").addEventListener("click", () => {
+    const code = String(state.room?.code || "").trim().toUpperCase();
+    if (!/^[A-Z2-9]{6}$/.test(code)) {
+      toast("有効な部屋コードがありません。");
+      return;
+    }
+    // フォールバック（検証済みの同じ文字列を書き込む）を先に実行して確実性を担保
+    const copied = copyViaExecCommand(code);
+    // 対応環境では非同期APIでも上書きしておく（同じ検証済み文字列）
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(code).catch(() => {});
+    }
+    if (copied || navigator.clipboard?.writeText) {
+      toast(`コピーしました: ${code}`);
+    } else {
+      toast(`部屋コード：${code}`);
     }
   });
   $("btn-open-sources").addEventListener("click", () => showDialog($("sources-dialog")));

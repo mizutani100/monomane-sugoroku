@@ -1,0 +1,15 @@
+# Cloudflare Pages の静的配信から除外するもの（functions/ は自動でビルドされ配信対象外）
+node_modules
+.wrangler
+.git
+.dev.vars
+migrations
+docs
+api
+router.php
+test_api.sh
+test_api_cf.sh
+package.json
+wrangler.toml
+.gitignore
+.assetsignore

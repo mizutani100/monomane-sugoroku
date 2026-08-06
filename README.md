@@ -51,22 +51,33 @@
 
 ## 技術構成
 
-サーバに重い処理をさせない構成。Apacheに置くだけで動く。
+サーバに重い処理をさせない構成。**2つのバックエンド実装があり、どちらでも同一のフロントエンド・同一のAPI仕様で動く**。
+
+- **Cloudflare版**（`functions/` + D1）… サーバ不要。`*.pages.dev` のURLでHTTPS付きで公開でき、そのままスマホで遊べる
+- **自前Apache版**（`api/*.php` + SQLite）… 自分のサーバ／レンタルサーバにApache + PHPで設置する
 
 ```
 ブラウザ（スマホ・PWA）
  ├── 地図表示 …… Leaflet + CARTO Voyager タイル
  ├── 盤面生成 …… JavaScript（目標マス間距離ベースの貪欲法）
  ├── GPS判定 …… Geolocation API（半径70m以内で到着）
- ├── 写真 …… 端末内で長辺1280pxへ縮小してから送信
+ ├── 写真 …… 端末内で長辺1000px・JPEG品質0.75へ縮小してから送信
  └── オフライン …… Service Worker（アプリシェル・地図タイルをキャッシュ）
 
-サーバ（Apache + PHP 8 + SQLite）
- ├── 部屋・参加・進行の同期（5秒ポーリング）
- ├── 写真の保存と配信（部屋メンバーのみ・トークン認証）
+バックエンドA: Cloudflare Pages Functions + D1
+ ├── functions/api/[[path]].js … 全APIを1ファイルで処理
+ ├── 写真の保存と配信 …… D1にBLOBで保存（R2不使用）
  ├── 相互採点と得点計算
- └── openrouteserviceへのプロキシ（APIキーをブラウザに出さない）
+ └── openrouteserviceへのプロキシ（キーは環境変数 ORS_API_KEY）
+
+バックエンドB: Apache + PHP 8 + SQLite
+ ├── api/index.php + api/lib.php … 同一仕様のPHP実装
+ ├── 写真の保存と配信 …… api/data/ 配下にファイル保存
+ ├── 相互採点と得点計算
+ └── openrouteserviceへのプロキシ（キーは api/secrets.php）
 ```
+
+どちらの実装も「絶対に変えてはいけない仕様」（自己採点禁止・得点計算・ネット投票の分離・本人のみ公開・取り下げで即削除・部屋メンバーのみ閲覧など）を満たす。`test_api.sh`（Apache版）と `test_api_cf.sh`（Cloudflare版）でそれぞれ検証できる。
 
 ### 盤面生成のアルゴリズム
 
@@ -83,7 +94,71 @@
 
 最短経路を作るのではなく「歩き応えのある間隔」を作るのが目的。
 
-## セットアップ
+## セットアップ（Cloudflare版）
+
+サーバを持たなくても、Cloudflareの無料枠だけで公開できる。必要なもの: Node.js 18以上とCloudflareアカウント（無料・クレジットカード不要）。
+
+```bash
+git clone https://github.com/<あなたのユーザー名>/monomane-sugoroku.git
+cd monomane-sugoroku
+npm install
+```
+
+### 1. ローカルで動かす
+
+```bash
+# D1データベースにスキーマを適用（ローカル）
+npx wrangler d1 execute monomane-sugoroku --local --file=./migrations/0001_init.sql
+
+# 徒歩経路APIキーを使う場合のみ（未設定でも動作。直線距離表示になる）
+echo 'ORS_API_KEY=あなたのキー' > .dev.vars
+
+# 起動
+npx wrangler pages dev . --port 8788
+```
+
+ブラウザで <http://localhost:8788> を開く。APIの自動テストは別ターミナルで:
+
+```bash
+bash test_api_cf.sh
+```
+
+「絶対に変えてはいけない仕様」10項目（自己採点禁止・得点計算・ネット投票の分離・本人のみ公開・取り下げで即削除・部屋メンバーのみ閲覧など）を番号付きで検証する。
+
+### 2. Cloudflareへデプロイ
+
+```bash
+npx wrangler login
+
+# 本番D1を作成し、出力された database_id を wrangler.toml の
+# [[d1_databases]] の database_id に貼る
+npx wrangler d1 create monomane-sugoroku
+
+# 本番D1にスキーマを適用
+npx wrangler d1 execute monomane-sugoroku --remote --file=./migrations/0001_init.sql
+
+# 徒歩経路APIキー（任意）を本番シークレットに登録
+npx wrangler pages secret put ORS_API_KEY
+
+# デプロイ
+npx wrangler pages deploy .
+```
+
+発行された `https://*.pages.dev` のURLでスマホからそのまま遊べる（HTTPS付き）。GitHub連携（Pages の Git連携）を設定すれば、pushで自動デプロイもできる。
+
+#### なぜ写真をD1にBLOB保存するのか（設計判断）
+
+本来こうした画像はオブジェクトストレージ（Cloudflare R2）に置くのが定石だが、**R2は無料でも支払い方法（クレジットカード）の登録が必要**。授業課題として誰でもカード登録なしで再現できることを優先し、**写真はD1（SQLite）にBLOBとして保存**する方式を採った。
+
+- D1無料枠: 1データベース最大 **500MB**・1行最大 **2MB**
+- 写真はクライアント側で長辺1000px・JPEG品質0.75へ縮小（1枚 **約200KB**）
+- 容量見積り: **500MB ÷ 200KB ≒ 2,500枚**。部屋は30日で自動削除されるため、授業規模なら十分
+
+#### EXIF（GPS）除去についての方針変更
+
+PHP版は `getimagesize()` でMIME検証し、GDで再エンコードしてEXIF（GPS含む）を除去していた。Workers環境には画像ライブラリが無いため、Cloudflare版では **①先頭バイト（マジックバイト）でのMIME検証** ＋ **②クライアント側でCanvasを通した再エンコード済みであること**で代替する。ブラウザのCanvasを経由した時点でEXIFは失われるため、GPS情報がサーバに残ることはない。
+
+## セットアップ（自前Apache版）
 
 必要なもの: PHP 8以上（`pdo_sqlite` と `gd` 拡張）
 

@@ -62,7 +62,16 @@ button:disabled { cursor: not-allowed; opacity: .45; }
   box-shadow: var(--shadow);
   backdrop-filter: blur(14px);
 }
-.panel-grip { width: 42px; height: 4px; border-radius: 999px; background: #cbd3cf; margin: 0 auto 8px; }
+/* グリップ：タップでパネルを折りたたみ／展開。見た目は細いバー、タップ領域は広め */
+.panel-grip { display: block; width: 64px; padding: 8px 0; margin: -4px auto 4px; border: none; background: transparent; cursor: pointer; -webkit-appearance: none; appearance: none; }
+.panel-grip::before { content: ""; display: block; width: 42px; height: 4px; margin: 0 auto; border-radius: 999px; background: #cbd3cf; transition: background .15s ease; }
+.panel-grip:hover::before, .panel-grip:focus-visible::before { background: #9aa5a0; }
+/* 折りたたみ時：タイトルと主ボタンだけを残す */
+.bottom-panel.collapsed .form-grid,
+.bottom-panel.collapsed .range-field,
+.bottom-panel.collapsed .fine-print,
+.bottom-panel.collapsed .target-card,
+.bottom-panel.collapsed .compact-row { display: none; }
 .panel-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .panel-heading h2 { margin: 0; font-size: 17px; }
 .status-text { margin: 3px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
@@ -456,6 +465,16 @@ button:disabled { cursor: not-allowed; opacity: .45; }
   line-height: 1.5;
 }
 .emoji-marker.current .route-number { background: #1a73e8; }
+/* コマが1マス進むときの一瞬の強調（スケールアップ→戻す） */
+@keyframes marker-hop {
+  0% { transform: scale(1.32); }
+  45% { transform: scale(1.72); }
+  100% { transform: scale(1.32); }
+}
+.emoji-marker.current.hop { animation: marker-hop .32s ease; }
+@media (prefers-reduced-motion: reduce) {
+  .emoji-marker.current.hop { animation: none; }
+}
 .center-marker { font-size: 24px; opacity: .75; }
 .location-marker {
   width: 16px;
