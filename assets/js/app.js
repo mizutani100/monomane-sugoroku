@@ -956,7 +956,10 @@
   }
 
   map.on("click", (event) => {
-    if (!$("setup-panel").classList.contains("hidden")) setCenter(event.latlng);
+    if (!$("setup-panel").classList.contains("hidden")) {
+      setCenter(event.latlng);
+      fitCenterCircle(); // タップした中心の円全体が、パネルに隠れない位置に収まるよう調整
+    }
   });
 
   function updateRadiusLabel(radiusKm) {
@@ -1827,7 +1830,8 @@
     $("game-panel").classList.add("hidden");
     $("setup-panel").classList.remove("hidden");
     $("player-name").value = profileNickname();
-    toast("地図をタップして中心地点を選んでください。", 3500);
+    setTimeout(fitCenterCircle, 80); // パネル表示後のレイアウト確定を待って円を映す
+    toast("地図をタップして中心地点を選んでください。スライダーで探索半径を調整できます。", 3500);
   });
   $("btn-join-room").addEventListener("click", joinRoom);
   $("btn-leave-room").addEventListener("click", leaveRoom);

@@ -61,6 +61,11 @@ button:disabled { cursor: not-allowed; opacity: .45; }
   background: var(--panel);
   box-shadow: var(--shadow);
   backdrop-filter: blur(14px);
+  /* 画面が低いと探索半径スライダーが画面外に隠れるため、パネル内でスクロールできるようにする */
+  max-height: calc(100vh - 88px);
+  max-height: calc(100dvh - 88px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 /* グリップ：タップでパネルを折りたたみ／展開。見た目は細いバー、タップ領域は広め */
 .panel-grip { display: block; width: 64px; padding: 8px 0; margin: -4px auto 4px; border: none; background: transparent; cursor: pointer; -webkit-appearance: none; appearance: none; }

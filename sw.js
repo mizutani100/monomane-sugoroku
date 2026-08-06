@@ -5,7 +5,7 @@
  *  - 地図タイルと被写体データはネットワーク優先＋キャッシュ退避（歩いた場所は再訪できる）
  *  - APIは常にネットワーク。キャッシュしない（採点・部屋の状態が古くなるため）
  */
-const VERSION = "v5.1.0";
+const VERSION = "v5.2.0";
 const SHELL_CACHE = `monomane-shell-${VERSION}`;
 const RUNTIME_CACHE = `monomane-runtime-${VERSION}`;
 
