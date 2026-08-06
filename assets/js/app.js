@@ -70,6 +70,72 @@
     toast.timer = setTimeout(() => el.classList.remove("show"), duration);
   }
 
+  /** 効果音エンジン（Web Audio APIで合成。外部ファイル不要でオフラインでも鳴る） */
+  const sfx = (() => {
+    let ctx = null;
+    let muted = localStorage.getItem("monomaneMuted") === "1";
+    const ensure = () => {
+      if (!ctx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return null;
+        try { ctx = new AC(); } catch { return null; }
+      }
+      if (ctx.state === "suspended") ctx.resume().catch(() => {});
+      return ctx;
+    };
+    function tone(freq, start, dur, { type = "sine", gain = 0.2, glideTo = null } = {}) {
+      const ac = ensure();
+      if (!ac || muted) return;
+      const t0 = ac.currentTime + start;
+      const osc = ac.createOscillator();
+      const g = ac.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, t0);
+      if (glideTo) osc.frequency.exponentialRampToValueAtTime(glideTo, t0 + dur);
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(gain, t0 + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      osc.connect(g).connect(ac.destination);
+      osc.start(t0);
+      osc.stop(t0 + dur + 0.03);
+    }
+    function noise(start, dur, gain = 0.2) {
+      const ac = ensure();
+      if (!ac || muted) return;
+      const t0 = ac.currentTime + start;
+      const len = Math.max(1, Math.floor(ac.sampleRate * dur));
+      const buf = ac.createBuffer(1, len, ac.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
+      const src = ac.createBufferSource();
+      src.buffer = buf;
+      const g = ac.createGain();
+      g.gain.setValueAtTime(gain, t0);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      src.connect(g).connect(ac.destination);
+      src.start(t0);
+    }
+    const chord = (freqs, start, dur, opts) => freqs.forEach((f) => tone(f, start, dur, opts));
+    return {
+      unlock: () => ensure(),
+      isMuted: () => muted,
+      toggleMute() {
+        muted = !muted;
+        localStorage.setItem("monomaneMuted", muted ? "1" : "0");
+        if (!muted) { ensure(); this.pop(); }
+        return muted;
+      },
+      dice() { for (let i = 0; i < 8; i++) tone(280 + Math.random() * 520, i * 0.055, 0.05, { type: "square", gain: 0.1 }); },
+      land() { chord([523, 659, 784], 0, 0.45, { type: "triangle", gain: 0.22 }); noise(0, 0.12, 0.12); },
+      arrive() { tone(880, 0, 0.12, { type: "sine", gain: 0.25, glideTo: 1320 }); tone(1320, 0.12, 0.28, { type: "sine", gain: 0.2 }); },
+      shutter() { noise(0, 0.05, 0.4); tone(1400, 0.02, 0.05, { type: "square", gain: 0.16 }); },
+      star() { tone(1046, 0, 0.09, { type: "triangle", gain: 0.2 }); tone(1568, 0.08, 0.14, { type: "triangle", gain: 0.18 }); },
+      win() { [523, 659, 784, 1046, 1319].forEach((f, i) => tone(f, i * 0.12, 0.38, { type: "triangle", gain: 0.22 })); noise(0.05, 0.4, 0.14); },
+      pop() { tone(600, 0, 0.08, { type: "sine", gain: 0.2, glideTo: 1000 }); },
+      error() { tone(320, 0, 0.2, { type: "sawtooth", gain: 0.18, glideTo: 150 }); }
+    };
+  })();
+
   function showDialog(dialog) {
     if (!dialog.open) dialog.showModal();
   }
@@ -593,6 +659,7 @@
     $("btn-dice").disabled = true;
     $("btn-arrival").disabled = true; // アニメーション中の二重操作を防ぐ
     const roll = Math.floor(Math.random() * 6) + 1;
+    sfx.dice();
     await playDiceAnimation(roll);
 
     const from = state.position;
@@ -610,6 +677,7 @@
     }
     state.position = to;
     markRouteProgress();
+    sfx.land();
 
     const target = state.route[state.position];
     const cat = CATEGORIES[target.category];
@@ -692,6 +760,7 @@
     $("mission-name").textContent = spot.name;
     $("mission-meta").textContent = `${cat.label}・難度★${spot.difficulty}｜${spot.source}｜${spot.license}`;
     $("mission-pose").textContent = `📸 ${cat.pose}`;
+    sfx.arrive();
     showDialog($("mission-dialog"));
   }
 
@@ -751,6 +820,7 @@
         $("btn-dice").disabled = false;
       }
       pollState();
+      sfx.shutter();
       toast("写真を送りました。点数はみんながつけます。");
     } catch (error) {
       toast(`送信できません：${error.message}`, 5000);
@@ -796,6 +866,7 @@
       figure.append(image, caption);
       album.append(figure);
     });
+    sfx.win();
     showDialog($("result-dialog"));
   }
 
@@ -1097,6 +1168,7 @@
         toast("撮影に失敗しました。もう一度お試しください。");
         return;
       }
+      sfx.shutter();
       usePhotoFile(new File([blob], `camera-${Date.now()}.jpg`, { type: "image/jpeg" }));
       closeCamera();
     }, "image/jpeg", 0.92);
@@ -1127,6 +1199,14 @@
 
   $("btn-sources").addEventListener("click", () => showDialog($("sources-dialog")));
   $("score-chip").addEventListener("click", () => showDialog($("sources-dialog")));
+
+  // 効果音のオン／オフ
+  $("btn-sound").textContent = sfx.isMuted() ? "🔇" : "🔊";
+  $("btn-sound").addEventListener("click", () => {
+    const muted = sfx.toggleMute();
+    $("btn-sound").textContent = muted ? "🔇" : "🔊";
+    toast(muted ? "効果音をオフにしました。" : "効果音をオンにしました。", 1600);
+  });
   $("btn-close-sources").addEventListener("click", () => closeDialog($("sources-dialog")));
 
   window.addEventListener("beforeunload", () => {
@@ -1437,6 +1517,7 @@
             method: "POST",
             body: { stars: Number(card.dataset.stars), poleBonus: bonus.checked }
           });
+          sfx.star();
           toast("採点しました。");
           pollState();
         } catch (error) {
@@ -1743,6 +1824,7 @@
       if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
       closeDialog($("privacy-dialog"));
       state.editor = null;
+      sfx.star();
       toast("ネットに公開しました。いつでも取り下げできます。", 4500);
       pollState();
       loadGallery();

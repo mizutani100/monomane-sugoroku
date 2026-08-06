@@ -494,3 +494,167 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 /* Leafletのフォントを本文に合わせる */
 .leaflet-container { font-family: inherit; }
 .leaflet-control-attribution { font-size: 9px; opacity: .75; }
+
+/* =======================================================================
+   🔥🔥🔥 鬼のように派手テーマ (v5.4) 🔥🔥🔥
+   ネオン・虹グラデ・グロー・アニメーション全部盛り
+   ======================================================================= */
+@keyframes bg-pan   { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
+@keyframes shine    { 0%{background-position:-250% 0} 100%{background-position:250% 0} }
+@keyframes wiggle   { 0%,100%{transform:rotate(-9deg) scale(1.05)} 50%{transform:rotate(9deg) scale(1.2)} }
+@keyframes floaty   { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-3px)} }
+@keyframes chip-pulse {
+  0%,100% { box-shadow: 0 0 0 2px #fff, 0 0 12px #ffb300, 0 0 24px #ff5e00; }
+  50%     { box-shadow: 0 0 0 2px #fff, 0 0 22px #ffd000, 0 0 52px #ff008c; }
+}
+@keyframes dice-glow {
+  0%,100% { box-shadow: 0 0 16px #ff5e00, 0 0 34px rgba(255,0,140,.7); }
+  50%     { box-shadow: 0 0 30px #ffd000, 0 0 66px rgba(0,229,255,.8); }
+}
+
+/* 背景・ビュー：暗い宇宙＋動く虹グラデ */
+body { background: #05010f; }
+#view-judge, #view-profile { background: #05010f; }
+.view-scroll {
+  background:
+    radial-gradient(120% 80% at 0% 0%, rgba(255,0,140,.20), transparent 60%),
+    radial-gradient(120% 80% at 100% 0%, rgba(0,229,255,.20), transparent 60%),
+    linear-gradient(160deg,#12002e,#1b0140 40%,#04030f);
+}
+
+/* ヘッダー：流れる虹＋グロー */
+.app-header {
+  background: linear-gradient(120deg,#ff008c,#ff5e00,#ffe000,#00e5ff,#8a2be2,#ff008c);
+  background-size: 300% 300%;
+  animation: bg-pan 8s linear infinite;
+  border-bottom: 2px solid rgba(255,255,255,.55);
+  box-shadow: 0 6px 30px rgba(255,0,140,.55);
+}
+.app-header h1 {
+  color: #fff;
+  text-shadow: 0 0 10px #fff, 0 0 20px #ff00d4, 0 0 34px #00e5ff;
+  animation: floaty 3s ease-in-out infinite;
+}
+.header-sub { color:#fff; opacity:.95; text-shadow: 0 0 8px rgba(0,229,255,.9); }
+
+/* 得点チップ：脈打つゴールド */
+.score-chip {
+  background: linear-gradient(135deg,#ffd000,#ff6a00);
+  color:#3a0000; font-weight: 900;
+  animation: chip-pulse 1.6s ease-in-out infinite;
+}
+
+/* ボタン全般：ネオン＋光沢スイープ＋ホバーで浮く */
+.button {
+  position: relative; overflow: hidden; color:#fff;
+  letter-spacing:.3px; border:1px solid rgba(255,255,255,.35);
+  transition: transform .12s ease, box-shadow .2s ease, filter .2s ease;
+}
+.button::after {
+  content:""; position:absolute; inset:0;
+  background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,.55) 50%, transparent 80%);
+  background-size: 250% 100%;
+  animation: shine 2.6s linear infinite; pointer-events:none;
+}
+.button:hover { transform: translateY(-2px) scale(1.03); filter: brightness(1.1); }
+.button:active { transform: scale(.96); }
+.button.primary {
+  background: linear-gradient(135deg,#00e5ff,#2b7bff,#8a2be2);
+  box-shadow: 0 0 16px rgba(43,123,255,.75), 0 8px 20px rgba(138,43,226,.5);
+}
+.button.secondary {
+  background: linear-gradient(135deg,#ff4ecd,#a64bff);
+  box-shadow: 0 0 15px rgba(255,78,205,.7);
+}
+.camera-button, label.button {
+  background: linear-gradient(135deg,#00e5ff,#2b7bff,#8a2be2) !important; color:#fff !important;
+  box-shadow: 0 0 16px rgba(43,123,255,.7);
+}
+/* サイコロボタン：燃える虹＋点滅グロー */
+.button.dice {
+  background: linear-gradient(135deg,#ff008c,#ff5e00,#ffd000);
+  background-size: 200% 200%;
+  animation: bg-pan 3s linear infinite, dice-glow 1.4s ease-in-out infinite;
+}
+
+/* 丸ボタン・チップ */
+.round-button {
+  background: linear-gradient(135deg,#ff008c,#8a2be2); color:#fff;
+  box-shadow: 0 0 14px rgba(255,0,140,.7), 0 4px 12px rgba(0,0,0,.4);
+}
+.mini-chip {
+  background: linear-gradient(135deg,#00e5ff,#8a2be2); color:#fff;
+  box-shadow: 0 0 12px rgba(0,229,255,.7);
+}
+
+/* 下部パネル：ダーク＋ネオン枠 */
+.bottom-panel {
+  background: rgba(14,3,32,.92) !important;
+  color:#fff;
+  border: 1.5px solid transparent;
+  background:
+    linear-gradient(rgba(14,3,32,.94),rgba(14,3,32,.94)) padding-box,
+    linear-gradient(135deg,#ff008c,#00e5ff,#ffe000,#ff008c) border-box !important;
+  box-shadow: 0 0 26px rgba(255,0,140,.4), var(--shadow);
+}
+.bottom-panel h2 { color:#fff; text-shadow: 0 0 10px rgba(0,229,255,.8); }
+.status-text, .fine-print { color:#cdbff0 !important; }
+.panel-grip::before { background: linear-gradient(90deg,#ff008c,#00e5ff); }
+
+/* カード：虹枠＋グロー */
+.card {
+  border: 1.6px solid transparent;
+  background:
+    linear-gradient(#fff,#fff) padding-box,
+    linear-gradient(135deg,#ff008c,#00e5ff,#ffe000) border-box;
+  box-shadow: 0 0 20px rgba(255,0,140,.28), 0 6px 18px rgba(0,0,0,.35);
+}
+.card h3 {
+  background: linear-gradient(90deg,#ff008c,#8a2be2,#00e5ff);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.view-title {
+  background: linear-gradient(90deg,#ff008c,#ffd000,#00e5ff,#ff008c);
+  background-size: 200% auto;
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: bg-pan 4s linear infinite;
+  text-shadow: 0 0 24px rgba(255,0,140,.4);
+  font-weight: 900;
+}
+
+/* タブバー：ネオン */
+.tab-bar {
+  background: rgba(8,2,20,.95);
+  border-top: 2px solid transparent;
+  border-image: linear-gradient(90deg,#ff008c,#00e5ff,#ffe000,#ff008c) 1;
+  box-shadow: 0 -4px 26px rgba(255,0,140,.45);
+}
+.tab-button { color:#b9a7d6; }
+.tab-button.active {
+  color:#fff !important; font-weight: 900;
+  text-shadow: 0 0 12px #00e5ff, 0 0 22px #ff008c;
+}
+.tab-button.active .tab-icon { animation: wiggle .9s ease-in-out infinite; }
+.tab-badge { box-shadow: 0 0 12px #ff008c, 0 0 22px #ff5e00; }
+
+/* セグメント切替 */
+.segmented { background: rgba(255,255,255,.12); }
+.segmented-item.active {
+  background: linear-gradient(135deg,#ff008c,#8a2be2) !important; color:#fff !important;
+  box-shadow: 0 0 14px rgba(255,0,140,.7);
+}
+
+/* サイコロ演出：さらに派手に */
+.dice-overlay { background: radial-gradient(circle, rgba(40,0,60,.6), rgba(0,0,0,.75)); }
+.dice-face {
+  background: linear-gradient(135deg,#fff,#ffe9ff);
+  color:#ff008c;
+  box-shadow: 0 0 40px #ff008c, 0 0 80px #00e5ff, inset 0 -6px 0 rgba(0,0,0,.08);
+}
+
+/* 動きを抑える設定では派手なアニメだけ止める（可読性は維持） */
+@media (prefers-reduced-motion: reduce) {
+  .app-header, .button.dice, .view-title { animation: none; }
+  .button::after { animation: none; display: none; }
+  .app-header h1, .score-chip, .tab-button.active .tab-icon { animation: none; }
+}
