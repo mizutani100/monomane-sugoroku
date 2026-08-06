@@ -54,7 +54,7 @@
     attribution: CONFIG.mapAttribution,
     detectRetina: true
   }).addTo(map);
-  L.control.zoom({ position: "topright" }).addTo(map);
+  L.control.zoom({ position: "topleft" }).addTo(map); // 右上のツールバー（現在地・消音等）と重ならないよう左上へ
 
   function escapeHtml(value) {
     return String(value ?? "").replace(/[&<>'"]/g, (char) => ({
@@ -132,6 +132,7 @@
       star() { tone(1046, 0, 0.09, { type: "triangle", gain: 0.2 }); tone(1568, 0.08, 0.14, { type: "triangle", gain: 0.18 }); },
       win() { [523, 659, 784, 1046, 1319].forEach((f, i) => tone(f, i * 0.12, 0.38, { type: "triangle", gain: 0.22 })); noise(0.05, 0.4, 0.14); },
       pop() { tone(600, 0, 0.08, { type: "sine", gain: 0.2, glideTo: 1000 }); },
+      tick() { tone(680, 0, 0.035, { type: "square", gain: 0.07 }); }, // 全ボタン共通の短いクリック音
       error() { tone(320, 0, 0.2, { type: "sawtooth", gain: 0.18, glideTo: 150 }); }
     };
   })();
@@ -566,7 +567,18 @@
     $("btn-dice").disabled = false;
     $("btn-arrival").disabled = true;
     enhanceWithRoadRoute();
-    if (!state.room) createRoom();
+    // 盤面を作り直したときは、サーバの盤面とクライアントの盤面を必ず一致させるため
+    // 新しい部屋として作り直す（古い部屋のままだとspotIndexが範囲外になり送信に失敗する）
+    if (state.room) {
+      stopPolling();
+      state.peerMarkers.forEach((marker) => marker.remove());
+      state.peerMarkers.clear();
+      state.room = null;
+      state.me = null;
+      state.peers = [];
+      saveSession();
+    }
+    createRoom();
   }
 
   function resetGameState(resetRoute = true) {
@@ -1182,6 +1194,7 @@
   $("camera-dialog").addEventListener("cancel", stopCameraStream);
 
   $("btn-submit-photo").addEventListener("click", submitPhoto);
+  $("btn-decorate").addEventListener("click", () => openDecorateEditor(state.currentPhotoFile));
   $("mission-dialog").addEventListener("close", () => {
     if (state.targetReached && state.position >= 0) {
       $("btn-arrival").disabled = false;
@@ -1207,6 +1220,12 @@
     $("btn-sound").textContent = muted ? "🔇" : "🔊";
     toast(muted ? "効果音をオフにしました。" : "効果音をオンにしました。", 1600);
   });
+
+  // すべてのボタン押下に共通のクリック効果音（キャプチャ段階で拾う）
+  document.addEventListener("click", (event) => {
+    const button = event.target.closest("button");
+    if (button && !button.disabled && button.id !== "btn-sound") sfx.tick();
+  }, true);
   $("btn-close-sources").addEventListener("click", () => closeDialog($("sources-dialog")));
 
   window.addEventListener("beforeunload", () => {
@@ -1715,7 +1734,24 @@
 
   // ===================== P6: プライバシーエディタ & ネット採点 =====================
 
-  function openPrivacyEditor(photoId, file) {
+  /** エディタUIをモードに合わせて切り替える（publish=ネット公開 / decorate=写真に絵文字） */
+  function setEditorMode(mode) {
+    const isPublish = mode === "publish";
+    $("editor-title").textContent = isPublish ? "公開前に顔を隠す" : "顔に絵文字をつける";
+    $("editor-desc").textContent = isPublish
+      ? "スタンプを選んで顔をタップ、モザイクは指でなぞれます。大きさはスライダーで調整。写っている人の許可を取ってから公開してください。"
+      : "スタンプを選んで顔をタップ。モザイクは指でなぞれます。大きさはスライダーで変えられます。";
+    $("publish-consent-row").classList.toggle("hidden", !isPublish);
+    $("btn-publish-confirm").classList.toggle("hidden", !isPublish);
+    $("btn-editor-apply").classList.toggle("hidden", isPublish);
+    if (isPublish) {
+      $("publish-consent").checked = false;
+      $("btn-publish-confirm").disabled = true;
+    }
+  }
+
+  /** 画像をエディタcanvasに読み込んで開く（publish/decorate共通） */
+  function openEditor(file, mode, photoId = null) {
     const canvas = $("privacy-canvas");
     const ctx = canvas.getContext("2d");
     const image = new Image();
@@ -1724,16 +1760,27 @@
       const scale = Math.min(1, maxEdge / Math.max(image.width, image.height));
       canvas.width = Math.round(image.width * scale);
       canvas.height = Math.round(image.height * scale);
-      state.editor = { photoId, image, ctx, canvas, strokes: [], tool: "mosaic", drawing: false };
+      const sizeScale = Number($("editor-size").value) || 1;
+      state.editor = { photoId, mode, image, ctx, canvas, strokes: [], tool: "mosaic", drawing: false, sizeScale };
       redrawEditor();
-      $("publish-consent").checked = false;
-      $("btn-publish-confirm").disabled = true;
       document.querySelectorAll(".tool-button").forEach((button, index) => {
         button.classList.toggle("active", index === 0);
       });
+      setEditorMode(mode);
       showDialog($("privacy-dialog"));
     };
     image.src = URL.createObjectURL(file);
+  }
+
+  // ネット公開前の顔隠しエディタ（本人のみ・公開用）
+  function openPrivacyEditor(photoId, file) {
+    openEditor(file, "publish", photoId);
+  }
+
+  // 部屋にも使える「顔に絵文字」エディタ。編集結果を送信用の写真として採用する
+  function openDecorateEditor(file) {
+    if (!file) { toast("先に写真を撮る／選んでください。"); return; }
+    openEditor(file, "decorate");
   }
 
   function redrawEditor() {
@@ -1786,7 +1833,8 @@
     if (!ed) return;
     event.preventDefault();
     ed.drawing = true;
-    const size = Math.round(Math.max(ed.canvas.width, ed.canvas.height) * 0.11);
+    const base = Math.max(ed.canvas.width, ed.canvas.height) * 0.11;
+    const size = Math.round(base * (ed.sizeScale || 1));
     ed.strokes.push({ tool: ed.tool, size, points: [editorPoint(event)] });
     redrawEditor();
   }
@@ -1984,10 +2032,34 @@
     $("btn-publish-confirm").disabled = !event.target.checked;
   });
   $("btn-publish-confirm").addEventListener("click", confirmPublish);
+
+  // 絵文字／モザイクの大きさスライダー
+  const sizeLabels = [[0.7, "ちいさい"], [1.2, "ふつう"], [1.8, "おおきい"], [10, "きょだい"]];
+  $("editor-size").addEventListener("input", (event) => {
+    const value = Number(event.target.value);
+    if (state.editor) state.editor.sizeScale = value;
+    $("editor-size-label").textContent = (sizeLabels.find(([max]) => value <= max) || sizeLabels.at(-1))[1];
+  });
+
+  // 「この写真に使う」：編集結果を送信用の写真として採用（部屋にも使える基本機能）
+  $("btn-editor-apply").addEventListener("click", () => {
+    const ed = state.editor;
+    if (!ed) return;
+    ed.canvas.toBlob((blob) => {
+      if (!blob) { toast("画像を処理できませんでした。"); return; }
+      usePhotoFile(new File([blob], "decorated.jpg", { type: "image/jpeg" }));
+      closeDialog($("privacy-dialog"));
+      state.editor = null;
+      sfx.pop();
+      toast("絵文字をつけました。この写真を送れます。");
+    }, "image/jpeg", 0.9);
+  });
+
   $("btn-privacy-cancel").addEventListener("click", () => {
+    const wasPublish = state.editor?.mode === "publish";
     closeDialog($("privacy-dialog"));
     state.editor = null;
-    toast("部屋にだけ送信済みです。ネット公開はしていません。", 4000);
+    if (wasPublish) toast("部屋にだけ送信済みです。ネット公開はしていません。", 4000);
   });
 
   // --- ボタン結線 ---

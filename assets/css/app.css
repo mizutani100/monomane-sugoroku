@@ -598,7 +598,8 @@ body { background: #05010f; }
   box-shadow: 0 0 26px rgba(255,0,140,.4), var(--shadow);
 }
 .bottom-panel h2 { color:#fff; text-shadow: 0 0 10px rgba(0,229,255,.8); }
-.status-text, .fine-print { color:#cdbff0 !important; }
+/* 暗いパネル内のテキストだけ明るく（白カード上の.fine-printは既定色のまま維持） */
+.bottom-panel .status-text, .bottom-panel .fine-print { color:#cdbff0 !important; }
 .panel-grip::before { background: linear-gradient(90deg,#ff008c,#00e5ff); }
 
 /* カード：虹枠＋グロー */
@@ -651,6 +652,28 @@ body { background: #05010f; }
   color:#ff008c;
   box-shadow: 0 0 40px #ff008c, 0 0 80px #00e5ff, inset 0 -6px 0 rgba(0,0,0,.08);
 }
+
+/* 目的地カード：白背景に白文字で消えていたのを高コントラスト＆ド派手に */
+.target-card {
+  background: linear-gradient(135deg,#2a0a4d,#4a0d6e) !important;
+  border: 1.6px solid #ff008c;
+  box-shadow: 0 0 18px rgba(255,0,140,.55), inset 0 0 12px rgba(0,229,255,.15);
+}
+.target-card strong, #target-name {
+  color: #fff;
+  font-weight: 900;
+  font-size: 16px;
+  text-shadow: 0 0 8px #00e5ff, 0 0 16px #ff008c, 0 1px 2px #000;
+}
+.target-emoji { filter: drop-shadow(0 0 8px #ffd000); }
+.target-card p, #target-distance { color: #ffe0f7 !important; text-shadow: 0 1px 2px rgba(0,0,0,.5); }
+
+/* 絵文字サイズスライダー */
+.editor-size-field { display: block; margin: 4px 0 8px; font-size: 12px; color: var(--muted); }
+.editor-size-field span { display: block; margin-bottom: 4px; }
+.editor-size-field strong { color: #ff008c; }
+.editor-size-field input[type="range"] { width: 100%; accent-color: #ff008c; }
+.tool-button { font-size: 18px; }
 
 /* 動きを抑える設定では派手なアニメだけ止める（可読性は維持） */
 @media (prefers-reduced-motion: reduce) {

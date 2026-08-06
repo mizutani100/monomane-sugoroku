@@ -267,6 +267,7 @@
       <img id="photo-preview" class="photo-preview hidden" alt="撮影した写真のプレビュー">
 
       <section id="submit-section" class="judge-section hidden">
+        <button id="btn-decorate" class="button secondary" type="button">😊 顔に絵文字をつける</button>
         <p class="submit-note">送り先を選んでください</p>
         <div class="destination-list">
           <label class="destination">
@@ -305,22 +306,32 @@
   <dialog id="privacy-dialog" class="app-dialog wide-dialog">
     <div class="dialog-card">
       <button id="btn-privacy-cancel" class="dialog-close" type="button" aria-label="閉じる">×</button>
-      <h2>公開前に顔を隠す</h2>
-      <p class="fine-print">指でなぞるとモザイク、スタンプを選ぶと絵文字を貼れます。写っている人の許可を取ってから公開してください。</p>
+      <h2 id="editor-title">顔に絵文字をつける</h2>
+      <p id="editor-desc" class="fine-print">スタンプを選んで顔をタップ。モザイクは指でなぞれます。大きさはスライダーで変えられます。</p>
       <div class="editor-tools">
         <button class="tool-button active" data-tool="mosaic" type="button">🔲 モザイク</button>
+        <button class="tool-button" data-tool="😀" type="button">😀</button>
+        <button class="tool-button" data-tool="😎" type="button">😎</button>
+        <button class="tool-button" data-tool="🙈" type="button">🙈</button>
+        <button class="tool-button" data-tool="⭐" type="button">⭐</button>
+        <button class="tool-button" data-tool="❤️" type="button">❤️</button>
         <button class="tool-button" data-tool="🗿" type="button">🗿</button>
         <button class="tool-button" data-tool="📮" type="button">📮</button>
         <button class="tool-button" data-tool="🥤" type="button">🥤</button>
         <button class="tool-button" data-tool="🚏" type="button">🚏</button>
       </div>
+      <label class="editor-size-field">
+        <span>大きさ <strong id="editor-size-label">ふつう</strong></span>
+        <input id="editor-size" type="range" min="0.4" max="2.4" step="0.1" value="1">
+      </label>
       <canvas id="privacy-canvas" class="privacy-canvas"></canvas>
       <div class="button-row compact-row">
         <button id="btn-editor-undo" class="text-button" type="button">↩ 1つ戻す</button>
         <button id="btn-editor-clear" class="text-button" type="button">全部消す</button>
       </div>
-      <label class="check-row"><input id="publish-consent" type="checkbox"> 写っている人の許可を取りました／場所が特定されても問題ありません</label>
+      <label id="publish-consent-row" class="check-row"><input id="publish-consent" type="checkbox"> 写っている人の許可を取りました／場所が特定されても問題ありません</label>
       <button id="btn-publish-confirm" class="button primary" type="button" disabled>この内容で公開する</button>
+      <button id="btn-editor-apply" class="button primary hidden" type="button">この写真に使う</button>
     </div>
   </dialog>
 
