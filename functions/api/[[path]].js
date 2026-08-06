@@ -389,6 +389,16 @@ export async function onRequest(context) {
   const db = env.DB;
 
   try {
+    // ===== 一時エンドポイント: Llamaライセンス同意（確認後に削除する） =====
+    if (method === 'GET' && segments.length === 1 && segments[0] === '_agree_llama') {
+      try {
+        const r = await env.AI.run(AI_MODEL, { prompt: 'agree' });
+        return json({ ok: true, model: AI_MODEL, result: r });
+      } catch (e) {
+        return json({ ok: false, model: AI_MODEL, error: String(e && e.message ? e.message : e) }, 200);
+      }
+    }
+
     await cleanupExpired(db);
 
     // ===== POST /route … ORSキーをサーバに隠したまま徒歩経路を代理取得 =====
