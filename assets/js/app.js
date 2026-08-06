@@ -870,15 +870,35 @@
       ctx.fillText(`★${item.rating}　+${item.gained}点`, x + 16, y + 376);
     });
 
-    canvas.toBlob((blob) => {
-      if (!blob) return;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `monomane-sugoroku-${new Date().toISOString().slice(0,10)}.png`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    }, "image/png");
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+    if (!blob) return false;
+    const filename = `monomane-sugoroku-${new Date().toISOString().slice(0, 10)}.png`;
+    return saveImage(blob, filename);
+  }
+
+  /**
+   * 画像を保存する。スマホでは共有シート経由（「画像を保存」でカメラロール＝写真アプリへ入る）を優先し、
+   * 非対応環境（PCなど）ではファイルダウンロードにフォールバックする。
+   * 戻り値: 保存/共有が完了すれば true、ユーザーがキャンセルすれば false。
+   */
+  async function saveImage(blob, filename) {
+    const file = new File([blob], filename, { type: "image/png" });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: "モノまね旅のしおり" });
+        return true;
+      } catch (error) {
+        if (error && error.name === "AbortError") return false; // ユーザーがキャンセルした
+        // 共有に失敗した場合は下のダウンロードにフォールバックする
+      }
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return true;
   }
 
   function renderSources() {
@@ -1820,8 +1840,8 @@
     const original = button.textContent;
     button.textContent = "作成中…";
     try {
-      await downloadAlbum();
-      toast("アルバム画像を保存しました。");
+      const saved = await downloadAlbum();
+      if (saved) toast("アルバム画像を書き出しました。共有メニューの「画像を保存」で写真に入ります。", 4500);
     } catch (error) {
       toast(`アルバムを作れません：${error.message}`, 4500);
     } finally {
