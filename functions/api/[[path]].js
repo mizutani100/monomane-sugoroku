@@ -74,7 +74,9 @@ async function judgePhoto(env, bytes, spot) {
   });
   const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('AI応答がタイムアウトしました')), AI_TIMEOUT_MS));
   const res = await Promise.race([run, timeout]);
-  const text = typeof res === 'string' ? res : (res && (res.response ?? res.description ?? res.text)) || '';
+  // このモデルは res.response を「文字列」または「パース済みオブジェクト」で返す。両対応する
+  const out = typeof res === 'string' ? res : (res && (res.response ?? res.description ?? res.text));
+  const text = out && typeof out === 'object' ? JSON.stringify(out) : String(out ?? '');
   return parseJudgement(text);
 }
 
