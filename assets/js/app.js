@@ -2142,14 +2142,26 @@
 
   window.addEventListener("beforeunload", stopPolling);
 
-  // ===== PWA: Service Worker 登録と更新検知 =====
+  // ===== PWA: Service Worker 登録と自動更新 =====
   if ("serviceWorker" in navigator && location.protocol !== "file:") {
+    // 新しいSWが有効化され制御が切り替わったら、一度だけ自動リロードして最新を反映する
+    let swReloading = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (swReloading) return;
+      swReloading = true;
+      location.reload();
+    });
+
     navigator.serviceWorker.register("sw.js").then((registration) => {
+      // 起動のたびに更新チェック
+      registration.update().catch(() => {});
       registration.addEventListener("updatefound", () => {
         const installing = registration.installing;
         if (!installing) return;
         installing.addEventListener("statechange", () => {
           if (installing.state === "installed" && navigator.serviceWorker.controller) {
+            // 新SWはinstallでskipWaitingするため通常は自動で切り替わるが、
+            // 念のため手動更新バーもフォールバックとして表示する
             $("update-bar").classList.remove("hidden");
             $("btn-update").onclick = () => {
               installing.postMessage("skipWaiting");

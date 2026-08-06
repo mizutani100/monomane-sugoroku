@@ -5,7 +5,7 @@
  *  - 地図タイルと被写体データはネットワーク優先＋キャッシュ退避（歩いた場所は再訪できる）
  *  - APIは常にネットワーク。キャッシュしない（採点・部屋の状態が古くなるため）
  */
-const VERSION = "v5.6.1";
+const VERSION = "v5.7.0";
 const SHELL_CACHE = `monomane-shell-${VERSION}`;
 const RUNTIME_CACHE = `monomane-runtime-${VERSION}`;
 
@@ -23,6 +23,7 @@ const SHELL_ASSETS = [
 ];
 
 self.addEventListener("install", (event) => {
+  self.skipWaiting(); // 新しいSWを待機させず即座に有効化して、更新をすぐ反映する
   event.waitUntil(
     caches.open(SHELL_CACHE)
       .then((cache) => cache.addAll(SHELL_ASSETS.map((url) => new Request(url, { cache: "reload" }))))
