@@ -1008,10 +1008,9 @@
   $("btn-play-again").addEventListener("click", resetToSetup);
   $("btn-download-album").addEventListener("click", downloadAlbum);
 
-  $("photo-input").addEventListener("change", (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
+  /** 選択／撮影した画像を採用してプレビューと送信欄を出す（ファイル選択・カメラ共通） */
+  function usePhotoFile(file) {
+    if (!file || !file.type.startsWith("image/")) {
       toast("画像ファイルを選んでください。");
       return;
     }
@@ -1021,7 +1020,94 @@
     $("photo-preview").src = state.currentPhotoUrl;
     $("photo-preview").classList.remove("hidden");
     $("submit-section").classList.remove("hidden");
+  }
+
+  $("photo-input").addEventListener("change", (event) => {
+    usePhotoFile(event.target.files[0]);
   });
+
+  // ===== ウェブカメラ撮影（PCのフロントカメラ・スマホのカメラ両対応） =====
+  let cameraStream = null;
+  let cameraFacing = "environment"; // スマホは背面優先。PCは前面(内蔵)カメラが使われる
+
+  async function startCameraStream() {
+    stopCameraStream();
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: cameraFacing } },
+      audio: false
+    });
+    const video = $("camera-video");
+    video.srcObject = cameraStream;
+    video.classList.toggle("mirrored", cameraFacing === "user"); // フロントは鏡像で自然に
+    await video.play().catch(() => {});
+  }
+
+  function stopCameraStream() {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach((track) => track.stop());
+      cameraStream = null;
+    }
+  }
+
+  function closeCamera() {
+    stopCameraStream();
+    const video = $("camera-video");
+    if (video) video.srcObject = null;
+    closeDialog($("camera-dialog"));
+  }
+
+  async function openCamera() {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      toast("このブラウザはカメラ撮影に対応していません。「写真を撮る／選ぶ」からファイルを選んでください。", 5000);
+      return;
+    }
+    showDialog($("camera-dialog"));
+    try {
+      await startCameraStream();
+    } catch (error) {
+      const msg = error?.name === "NotAllowedError"
+        ? "カメラの使用が許可されていません。ブラウザのカメラ権限を許可してください。"
+        : `カメラを起動できません：${error?.message || error}`;
+      toast(msg, 5000);
+      closeCamera();
+    }
+  }
+
+  async function switchCamera() {
+    cameraFacing = cameraFacing === "environment" ? "user" : "environment";
+    try {
+      await startCameraStream();
+    } catch (error) {
+      toast("このカメラに切り替えできませんでした。", 4000);
+    }
+  }
+
+  function captureFromCamera() {
+    const video = $("camera-video");
+    if (!video || !video.videoWidth) {
+      toast("カメラの準備中です。少し待ってからもう一度押してください。", 3500);
+      return;
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        toast("撮影に失敗しました。もう一度お試しください。");
+        return;
+      }
+      usePhotoFile(new File([blob], `camera-${Date.now()}.jpg`, { type: "image/jpeg" }));
+      closeCamera();
+    }, "image/jpeg", 0.92);
+  }
+
+  $("btn-open-camera").addEventListener("click", openCamera);
+  $("btn-camera-shoot").addEventListener("click", captureFromCamera);
+  $("btn-camera-switch").addEventListener("click", switchCamera);
+  $("btn-camera-close").addEventListener("click", closeCamera);
+  $("camera-dialog").addEventListener("close", stopCameraStream);
+  $("camera-dialog").addEventListener("cancel", stopCameraStream);
 
   $("btn-submit-photo").addEventListener("click", submitPhoto);
   $("mission-dialog").addEventListener("close", () => {

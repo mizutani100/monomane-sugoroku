@@ -133,6 +133,8 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .warning-box { margin-top: 8px; padding: 9px 11px; border-left: 4px solid #e0a21a; background: #fff9ea; color: #6e5a28; font-size: 11px; line-height: 1.5; }
 .camera-button { display: grid; place-items: center; background: #2b70c9; color: #fff; margin-top: 12px; cursor: pointer; }
 .photo-preview { width: 100%; max-height: 330px; object-fit: contain; background: #eef2f0; border-radius: 12px; margin-top: 10px; }
+.camera-video { width: 100%; max-height: 60vh; background: #000; border-radius: 12px; object-fit: contain; margin-bottom: 10px; }
+.camera-video.mirrored { transform: scaleX(-1); } /* フロントカメラのときだけ鏡像プレビュー */
 .judge-section { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
 .judge-section h3 { margin: 0; font-size: 15px; }
 .judge-section > p { margin: 4px 0 0; font-size: 11px; color: var(--muted); }

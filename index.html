@@ -262,6 +262,7 @@
 
       <label class="button camera-button" for="photo-input">📷 写真を撮る／選ぶ</label>
       <input id="photo-input" type="file" accept="image/*" capture="environment" hidden>
+      <button id="btn-open-camera" class="button secondary" type="button">📸 カメラで撮影（PCのカメラ対応）</button>
       <img id="photo-preview" class="photo-preview hidden" alt="撮影した写真のプレビュー">
 
       <section id="submit-section" class="judge-section hidden">
@@ -285,6 +286,19 @@
         <button id="btn-submit-photo" class="button primary" type="button">送る</button>
       </section>
     </form>
+  </dialog>
+
+  <dialog id="camera-dialog" class="app-dialog">
+    <div class="dialog-card camera-capture">
+      <button id="btn-camera-close" class="dialog-close" type="button" aria-label="閉じる">×</button>
+      <h2>カメラで撮影</h2>
+      <video id="camera-video" class="camera-video" autoplay playsinline muted></video>
+      <div class="button-row compact-row">
+        <button id="btn-camera-switch" class="text-button" type="button">🔄 カメラ切替</button>
+      </div>
+      <button id="btn-camera-shoot" class="button primary" type="button">📸 撮影する</button>
+      <p class="fine-print">PCの内蔵（フロント）カメラやスマホのカメラで撮影できます。初回はカメラ利用の許可が必要です。</p>
+    </div>
   </dialog>
 
   <dialog id="privacy-dialog" class="app-dialog wide-dialog">
