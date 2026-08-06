@@ -1,0 +1,2 @@
+# SQLite DB・写真の直接アクセスを拒否（配信はPHP経由でトークン検証する）
+Require all denied

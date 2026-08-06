@@ -1,0 +1,12 @@
+# === 絶対に公開してはいけないもの ===
+api/secrets.php          # openrouteserviceのAPIキー
+api/data/app.sqlite*     # 部屋・採点データ（SQLite）
+api/data/photos/         # 参加者の写真
+api/data/public/         # ネット公開用の写真
+
+# === 環境依存・一時ファイル ===
+.DS_Store
+*.log
+node_modules/
+.vscode/
+.idea/

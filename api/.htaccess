@@ -1,0 +1,4 @@
+# /api/* をすべて index.php へ（Apache用。php -S ではrouter.phpが同じ役割）
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^ index.php [QSA,L]

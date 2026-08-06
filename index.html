@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#235b47">
+  <meta name="description" content="道端の構造物になりきる位置情報すごろくゲーム">
+  <title>街のモノまねすごろく</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous">
+  <link rel="stylesheet" href="assets/css/app.css">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="モノまね">
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <h1>🎲 街のモノまねすごろく</h1>
+      <p id="data-summary" class="header-sub">データを読み込み中…</p>
+    </div>
+    <button id="score-chip" class="score-chip" type="button" aria-label="現在の得点">0点</button>
+  </header>
+
+  <main class="app-main">
+    <!-- ===== 採点タブ ===== -->
+    <section id="view-judge" class="tab-view hidden" aria-label="採点">
+      <div class="view-scroll">
+        <h2 class="view-title">採点</h2>
+        <div class="segmented" role="tablist">
+          <button id="seg-room" class="segmented-item active" type="button">部屋</button>
+          <button id="seg-net" class="segmented-item" type="button">🌐 ネット採点</button>
+        </div>
+        <div id="net-gallery" class="judge-feed hidden"></div>
+        <div id="scoreboard" class="scoreboard"></div>
+        <div id="judge-feed" class="judge-feed"></div>
+        <div id="judge-empty" class="empty-state">
+          <p class="empty-emoji">🌟</p>
+          <p>まだ採点できる写真がありません</p>
+          <p class="fine-print">みんなが写真を撮るとここに並びます（P3で実装）</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== マップタブ ===== -->
+    <section id="view-map" class="tab-view" aria-label="マップ">
+    <div id="map" aria-label="すごろく地図"></div>
+
+    <div class="map-toolbar" aria-label="地図操作">
+      <button id="btn-current-location" class="round-button" type="button" title="現在地へ移動">◎</button>
+      <button id="btn-sources" class="round-button" type="button" title="データ出典">ⓘ</button>
+    </div>
+
+    <section id="no-room-panel" class="bottom-panel" aria-labelledby="no-room-title">
+      <div class="panel-grip" aria-hidden="true"></div>
+      <div class="panel-heading">
+        <div>
+          <h2 id="no-room-title">まだ旅が始まっていません</h2>
+          <p class="status-text">プロフィールタブで新しいマップを作るか、部屋コードで参加してください。</p>
+        </div>
+      </div>
+      <div class="button-row">
+        <button id="btn-goto-profile" class="button primary" type="button">プロフィールへ</button>
+      </div>
+    </section>
+
+    <section id="setup-panel" class="bottom-panel hidden" aria-labelledby="setup-title">
+      <div class="panel-grip" aria-hidden="true"></div>
+      <div class="panel-heading">
+        <div>
+          <h2 id="setup-title">遊ぶ場所を決める</h2>
+          <p id="setup-status" class="status-text">地図をタップして中心地点を選んでください。</p>
+        </div>
+        <span id="candidate-chip" class="mini-chip">候補 0件</span>
+      </div>
+
+      <div class="form-grid">
+        <label class="field">
+          <span>プレイヤー名</span>
+          <input id="player-name" type="text" maxlength="20" value="挑戦者" autocomplete="nickname">
+        </label>
+
+        <label class="field">
+          <span>盤面のマス数</span>
+          <select id="route-count">
+            <option value="10">10マス</option>
+            <option value="12" selected>12マス</option>
+            <option value="15">15マス</option>
+          </select>
+        </label>
+      </div>
+
+      <label class="field range-field">
+        <span>探索半径 <strong id="radius-label">1.8 km（目標マス間 約432 m）</strong></span>
+        <input id="radius-range" type="range" min="0.3" max="5" step="0.1" value="1.8">
+      </label>
+
+      <div class="button-row">
+        <button id="btn-generate" class="button primary" type="button" disabled>盤面を生成</button>
+      </div>
+
+      <p class="fine-print">同名バス停は1地点だけ採用し、探索半径を広げるほど目標マス間距離も長くなります。位置情報と写真はサーバへ送信しません。</p>
+    </section>
+
+    <section id="game-panel" class="bottom-panel hidden" aria-labelledby="game-title">
+      <div class="panel-grip" aria-hidden="true"></div>
+      <div class="panel-heading">
+        <div>
+          <h2 id="game-title">すごろく進行</h2>
+          <p id="game-status" class="status-text">サイコロを振ってスタート。</p>
+        </div>
+        <span id="progress-chip" class="mini-chip">0 / 12</span>
+      </div>
+
+      <div id="target-card" class="target-card hidden">
+        <div id="target-emoji" class="target-emoji">🚏</div>
+        <div>
+          <strong id="target-name">目的地</strong>
+          <p id="target-distance">現在地との距離を確認してください。</p>
+        </div>
+      </div>
+
+      <div class="button-row game-buttons">
+        <button id="btn-dice" class="button dice" type="button">🎲 サイコロ</button>
+        <button id="btn-arrival" class="button primary" type="button" disabled>📍 到着判定</button>
+      </div>
+      <div class="button-row compact-row">
+        <button id="btn-demo-arrival" class="text-button hidden" type="button">デモ到着</button>
+        <button id="btn-reset" class="text-button danger" type="button">盤面を作り直す</button>
+      </div>
+    </section>
+    </section><!-- /view-map -->
+
+    <!-- ===== プロフィールタブ ===== -->
+    <section id="view-profile" class="tab-view hidden" aria-label="プロフィール">
+      <div class="view-scroll">
+        <h2 class="view-title">プロフィール</h2>
+
+        <div class="card">
+          <h3>あなた</h3>
+          <div class="form-grid">
+            <label class="field">
+              <span>ニックネーム</span>
+              <input id="profile-nickname" type="text" maxlength="10" placeholder="みさと" autocomplete="nickname">
+            </label>
+            <label class="field">
+              <span>アイコン</span>
+              <select id="profile-icon">
+                <option>🙂</option><option>🗿</option><option>📮</option><option>🚏</option>
+                <option>🥤</option><option>🧯</option><option>🌳</option><option>📞</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <div id="room-card" class="card hidden">
+          <h3>参加中の部屋</h3>
+          <p class="room-code-display">部屋コード <strong id="room-code-text">------</strong></p>
+          <div id="member-list" class="member-list"></div>
+          <div class="button-row compact-row">
+            <button id="btn-copy-code" class="text-button" type="button">コードをコピー</button>
+            <button id="btn-leave-room" class="text-button danger" type="button">部屋を出る</button>
+          </div>
+        </div>
+
+        <div id="create-card" class="card">
+          <h3>新しいマップを作る</h3>
+          <p class="fine-print">地図タブで中心地点を選び、条件を決めて盤面を作ります。作成すると部屋コードが発行され、みんなを招待できます。</p>
+          <div class="button-row">
+            <button id="btn-open-setup" class="button primary" type="button">マップ作成をはじめる</button>
+          </div>
+        </div>
+
+        <div id="join-card" class="card">
+          <h3>部屋に参加する</h3>
+          <label class="field">
+            <span>部屋コード（6桁）</span>
+            <input id="join-code" type="text" maxlength="6" placeholder="ABC123" autocapitalize="characters" autocomplete="off">
+          </label>
+          <div class="button-row">
+            <button id="btn-join-room" class="button primary" type="button">参加する</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>被写体データ</h3>
+          <p id="data-detail" class="fine-print">読み込み中…</p>
+          <div class="button-row">
+            <label class="button secondary file-button" for="geojson-input">GeoJSONを追加</label>
+            <input id="geojson-input" type="file" accept=".geojson,.json,application/geo+json,application/json" hidden>
+          </div>
+          <p class="fine-print">自分で用意したPoint形式のGeoJSONを盤面の候補に加えられます（category属性が必要）。</p>
+        </div>
+
+        <div class="card">
+          <h3>アプリ情報</h3>
+          <div class="button-row compact-row">
+            <button id="btn-open-sources" class="text-button" type="button">データ出典・ライセンス</button>
+            <button id="btn-open-safety" class="text-button" type="button">安全ルールを読む</button>
+          </div>
+          <p class="fine-print">街のモノまねすごろく v5.0</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <nav class="tab-bar" role="tablist" aria-label="メインメニュー">
+    <button class="tab-button" data-tab="judge" role="tab" type="button">
+      <span class="tab-icon">🌟</span><span class="tab-label">採点</span>
+      <span id="judge-badge" class="tab-badge hidden">0</span>
+    </button>
+    <button class="tab-button active" data-tab="map" role="tab" type="button" aria-selected="true">
+      <span class="tab-icon">🗺️</span><span class="tab-label">マップ</span>
+    </button>
+    <button class="tab-button" data-tab="profile" role="tab" type="button">
+      <span class="tab-icon">👤</span><span class="tab-label">プロフィール</span>
+    </button>
+  </nav>
+
+  <div id="update-bar" class="update-bar hidden">
+    <span>新しいバージョンがあります</span>
+    <button id="btn-update" type="button">更新する</button>
+  </div>
+
+  <div id="offline-bar" class="offline-bar hidden">オフラインです。撮影と地図は使えます</div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <dialog id="safety-dialog" class="app-dialog">
+    <form method="dialog" class="dialog-card">
+      <h2>遊ぶ前の安全ルール</h2>
+      <ul class="safety-list">
+        <li>車道・私有地・立入禁止区域へ入らない。</li>
+        <li>地面に寝るポーズは、安全な広場などで代替する。</li>
+        <li>設備に触れたり、台座へ登ったりしない。</li>
+        <li>通行人の顔や車両番号を無断で撮影しない。</li>
+      </ul>
+      <label class="check-row"><input id="safety-check" type="checkbox"> 安全を優先して遊ぶ</label>
+      <button id="btn-safety-ok" class="button primary" value="ok" disabled>同意して閉じる</button>
+    </form>
+  </dialog>
+
+  <dialog id="mission-dialog" class="app-dialog">
+    <form method="dialog" class="dialog-card mission-card" id="mission-form">
+      <button class="dialog-close" value="cancel" aria-label="閉じる">×</button>
+      <div class="mission-head">
+        <div id="mission-emoji" class="mission-emoji">🗿</div>
+        <div>
+          <p id="mission-kicker" class="kicker">マス1</p>
+          <h2 id="mission-name">スポット名</h2>
+          <p id="mission-meta" class="meta-text"></p>
+        </div>
+      </div>
+
+      <div id="mission-pose" class="pose-box"></div>
+      <div class="warning-box">被写体と本人を同じフレームに。危険な場所ではポーズを簡略化してください。</div>
+
+      <label class="button camera-button" for="photo-input">📷 写真を撮る／選ぶ</label>
+      <input id="photo-input" type="file" accept="image/*" capture="environment" hidden>
+      <img id="photo-preview" class="photo-preview hidden" alt="撮影した写真のプレビュー">
+
+      <section id="submit-section" class="judge-section hidden">
+        <p class="submit-note">送り先を選んでください</p>
+        <div class="destination-list">
+          <label class="destination">
+            <input type="radio" name="destination" value="room" checked>
+            <span class="destination-body">
+              <strong>🏠 部屋のみんなに送る</strong>
+              <small>同行メンバーだけが見て採点します（30日で自動削除）</small>
+            </span>
+          </label>
+          <label class="destination">
+            <input type="radio" name="destination" value="net">
+            <span class="destination-body">
+              <strong>🌐 部屋＋ネットにも公開する</strong>
+              <small>顔を隠してから公開。世間の投票は得点に影響しません。いつでも取り下げOK</small>
+            </span>
+          </label>
+        </div>
+        <button id="btn-submit-photo" class="button primary" type="button">送る</button>
+      </section>
+    </form>
+  </dialog>
+
+  <dialog id="privacy-dialog" class="app-dialog wide-dialog">
+    <div class="dialog-card">
+      <button id="btn-privacy-cancel" class="dialog-close" type="button" aria-label="閉じる">×</button>
+      <h2>公開前に顔を隠す</h2>
+      <p class="fine-print">指でなぞるとモザイク、スタンプを選ぶと絵文字を貼れます。写っている人の許可を取ってから公開してください。</p>
+      <div class="editor-tools">
+        <button class="tool-button active" data-tool="mosaic" type="button">🔲 モザイク</button>
+        <button class="tool-button" data-tool="🗿" type="button">🗿</button>
+        <button class="tool-button" data-tool="📮" type="button">📮</button>
+        <button class="tool-button" data-tool="🥤" type="button">🥤</button>
+        <button class="tool-button" data-tool="🚏" type="button">🚏</button>
+      </div>
+      <canvas id="privacy-canvas" class="privacy-canvas"></canvas>
+      <div class="button-row compact-row">
+        <button id="btn-editor-undo" class="text-button" type="button">↩ 1つ戻す</button>
+        <button id="btn-editor-clear" class="text-button" type="button">全部消す</button>
+      </div>
+      <label class="check-row"><input id="publish-consent" type="checkbox"> 写っている人の許可を取りました／場所が特定されても問題ありません</label>
+      <button id="btn-publish-confirm" class="button primary" type="button" disabled>この内容で公開する</button>
+    </div>
+  </dialog>
+
+  <dialog id="result-dialog" class="app-dialog wide-dialog">
+    <div class="dialog-card result-card">
+      <p class="kicker">GAME CLEAR</p>
+      <h2>🏁 モノまね旅のしおり</h2>
+      <p id="result-summary" class="result-summary"></p>
+      <div id="awards" class="awards"></div>
+      <div id="album" class="album"></div>
+      <div class="button-row">
+        <button id="btn-download-album" class="button secondary" type="button">画像で保存</button>
+        <button id="btn-play-again" class="button primary" type="button">もう一度</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="sources-dialog" class="app-dialog">
+    <div class="dialog-card">
+      <button id="btn-close-sources" class="dialog-close" type="button" aria-label="閉じる">×</button>
+      <h2>データ出典・ライセンス</h2>
+      <div id="source-list" class="source-list"></div>
+      <p class="fine-print">背景地図：CARTO Voyager（&copy; OpenStreetMap contributors / &copy; CARTO）</p>
+      <p class="fine-print">徒歩経路：openrouteservice（APIキー設定時）／ © OpenStreetMap contributors</p>
+    </div>
+  </dialog>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>
