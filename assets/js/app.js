@@ -1167,6 +1167,7 @@
     state.room = { code: payload.room.code, status: payload.room.status };
     state.peers = (payload.players || []).filter((p) => p.id !== state.me?.playerId);
 
+    let boardRebuilt = false;
     if (isNewBoard && payload.room.board?.spots) {
       const route = spotsToRoute(payload.room.board.spots);
       if (route.length) {
@@ -1183,6 +1184,7 @@
         $("btn-dice").disabled = false;
         $("btn-demo-arrival").classList.toggle("hidden", !CONFIG.allowDemoArrival);
         enhanceWithRoadRoute();
+        boardRebuilt = true;
       }
     }
     state.photos = payload.photos || [];
@@ -1190,11 +1192,34 @@
     if (mine) {
       state.score = mine.score;
       $("score-chip").textContent = `${state.score}点`;
+      // リロードや再入室で盤面を組み直したとき、サーバが保持している現在マスへコマを戻す
+      if (boardRebuilt && Number.isInteger(mine.position) && mine.position >= 0) {
+        restorePosition(mine.position);
+      }
     }
     renderRoomCard();
     renderPeers();
     renderScoreboard();
     renderJudgeFeed();
+  }
+
+  /** サーバに保存された現在マスへコマを戻す（リロードしても振り出しに戻らないように） */
+  function restorePosition(pos) {
+    pos = Math.min(pos, state.route.length - 1);
+    state.position = pos;
+    state.targetReached = false;
+    markRouteProgress();
+    const target = state.route[pos];
+    if (!target) return;
+    const cat = CATEGORIES[target.category];
+    $("target-card").classList.remove("hidden");
+    $("target-emoji").textContent = cat.emoji;
+    $("target-name").textContent = `${pos + 1}. ${target.name}`;
+    $("target-distance").textContent = "現在地に移動して到着判定をするか、サイコロで次のマスへ。";
+    $("progress-chip").textContent = `${pos + 1} / ${state.route.length}`;
+    $("game-status").textContent = `前回の続きから再開：${pos + 1}マス目です。`;
+    $("btn-arrival").disabled = false;
+    $("btn-dice").disabled = false;
   }
 
   // ===== 採点フィード =====
