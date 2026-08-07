@@ -920,47 +920,54 @@
     }
   }
 
+  /** 二部門表彰（部屋全体から）を算出する。みんなのリアクション最多で決め、
+   *  リアクションが1つも無ければAIの星でフォールバックする（得点には無関係）。
+   *  写真が2枚未満なら null。結果ダイアログとアルバムPNGの両方で使う。 */
+  function computeAwards() {
+    const photos = state.photos;
+    if (photos.length < 2) return null;
+    const rx = (photo, emoji) => Number((photo.reactions || {})[emoji] || 0);
+    const totalReactions = photos.reduce(
+      (sum, p) => sum + Object.values(p.reactions || {}).reduce((a, b) => a + Number(b), 0), 0);
+    let best, worst, bestCaption, worstCaption;
+    if (totalReactions > 0) {
+      // そっくり大賞=👏最多（同数はAIの星が高い方）、なにこれ大賞=😆最多（同数はAIの星が低い方）
+      best = photos.reduce((a, b) =>
+        (rx(b, AWARD_SOKKURI) > rx(a, AWARD_SOKKURI) ||
+         (rx(b, AWARD_SOKKURI) === rx(a, AWARD_SOKKURI) && (b.aiStars ?? 0) > (a.aiStars ?? 0))) ? b : a);
+      worst = photos.reduce((a, b) =>
+        (rx(b, AWARD_NANIKORE) > rx(a, AWARD_NANIKORE) ||
+         (rx(b, AWARD_NANIKORE) === rx(a, AWARD_NANIKORE) && (b.aiStars ?? 5) < (a.aiStars ?? 5))) ? b : a);
+      bestCaption = `${AWARD_SOKKURI}×${rx(best, AWARD_SOKKURI)}`;
+      worstCaption = `${AWARD_NANIKORE}×${rx(worst, AWARD_NANIKORE)}`;
+    } else {
+      best = photos.reduce((a, b) => ((b.aiStars ?? 0) > (a.aiStars ?? 0) ? b : a));
+      worst = photos.reduce((a, b) => ((b.aiStars ?? 5) < (a.aiStars ?? 5) ? b : a));
+      bestCaption = `★${best.aiStars ?? "-"}`;
+      worstCaption = `★${worst.aiStars ?? "-"}`;
+    }
+    return [
+      { title: "🏆 そっくり大賞", photo: best, caption: bestCaption },
+      { title: "🤔 なにこれ大賞", photo: worst, caption: worstCaption }
+    ];
+  }
+
   function showResult() {
     const name = profileNickname();
     const mine = state.photos.filter((photo) => photo.playerId === state.me?.playerId);
     $("result-summary").textContent = `${name}：総合 ${state.score}点 ／ 撮影 ${mine.length}枚`;
 
-    // 二部門表彰（部屋全体から）。みんなのリアクション最多で決める（得点には無関係）。
-    // リアクションが1つも無ければAIの星でフォールバックする。
-    const rx = (photo, emoji) => Number((photo.reactions || {})[emoji] || 0);
-    const photos = state.photos;
-    const totalReactions = photos.reduce(
-      (sum, p) => sum + Object.values(p.reactions || {}).reduce((a, b) => a + Number(b), 0), 0);
     const awards = $("awards");
     awards.replaceChildren();
-    if (photos.length >= 2) {
-      let best, worst, bestCaption, worstCaption;
-      if (totalReactions > 0) {
-        // そっくり大賞=👏最多（同数はAIの星が高い方）、なにこれ大賞=😆最多（同数はAIの星が低い方）
-        best = photos.reduce((a, b) =>
-          (rx(b, AWARD_SOKKURI) > rx(a, AWARD_SOKKURI) ||
-           (rx(b, AWARD_SOKKURI) === rx(a, AWARD_SOKKURI) && (b.aiStars ?? 0) > (a.aiStars ?? 0))) ? b : a);
-        worst = photos.reduce((a, b) =>
-          (rx(b, AWARD_NANIKORE) > rx(a, AWARD_NANIKORE) ||
-           (rx(b, AWARD_NANIKORE) === rx(a, AWARD_NANIKORE) && (b.aiStars ?? 5) < (a.aiStars ?? 5))) ? b : a);
-        bestCaption = `${AWARD_SOKKURI}×${rx(best, AWARD_SOKKURI)}`;
-        worstCaption = `${AWARD_NANIKORE}×${rx(worst, AWARD_NANIKORE)}`;
-      } else {
-        best = photos.reduce((a, b) => ((b.aiStars ?? 0) > (a.aiStars ?? 0) ? b : a));
-        worst = photos.reduce((a, b) => ((b.aiStars ?? 5) < (a.aiStars ?? 5) ? b : a));
-        bestCaption = `★${best.aiStars ?? "-"}`;
-        worstCaption = `★${worst.aiStars ?? "-"}`;
-      }
-      [["🏆 そっくり大賞", best, bestCaption], ["🤔 なにこれ大賞", worst, worstCaption]].forEach(([title, photo, cap]) => {
-        const box = document.createElement("div");
-        box.className = "award";
-        box.innerHTML =
-          `<p class="award-title">${title}</p>` +
-          `<img class="award-image" src="${photo.url}?t=${encodeURIComponent(state.me?.token || "")}" alt="">` +
-          `<p class="award-caption">${escapeHtml(photo.nickname)}／${escapeHtml(photo.spotName)}　${cap}</p>`;
-        awards.append(box);
-      });
-    }
+    (computeAwards() || []).forEach(({ title, photo, caption }) => {
+      const box = document.createElement("div");
+      box.className = "award";
+      box.innerHTML =
+        `<p class="award-title">${title}</p>` +
+        `<img class="award-image" src="${photo.url}?t=${encodeURIComponent(state.me?.token || "")}" alt="">` +
+        `<p class="award-caption">${escapeHtml(photo.nickname)}／${escapeHtml(photo.spotName)}　${caption}</p>`;
+      awards.append(box);
+    });
 
     const album = $("album");
     album.replaceChildren();
@@ -999,10 +1006,11 @@
   }
 
   async function downloadAlbum() {
+    const token = encodeURIComponent(state.me?.token || "");
     const items = state.photos
       .filter((photo) => photo.playerId === state.me?.playerId)
       .map((photo) => ({
-        photoUrl: `${photo.url}?t=${encodeURIComponent(state.me?.token || "")}`,
+        photoUrl: `${photo.url}?t=${token}`,
         spot: { name: photo.spotName, category: photo.category },
         rating: photo.avgStars ?? 0,
         gained: photo.points
@@ -1016,10 +1024,18 @@
     const margin = 44;
     const headerH = 170;
     const rows = Math.ceil(state.album.length / cols);
+
+    // 大賞バンド（部屋全体の そっくり大賞／なにこれ大賞）。写真2枚未満なら無し
+    const awards = computeAwards();
+    const awImgH = 200;
+    const awCardH = awImgH + 78;
+    const awBandH = awards ? 56 + awCardH + 24 : 0; // ラベル + カード + 余白
+
     const canvas = document.createElement("canvas");
     canvas.width = margin * 2 + cols * cardW + gap;
-    canvas.height = headerH + margin + rows * cardH + Math.max(0, rows - 1) * gap + margin;
+    canvas.height = headerH + awBandH + margin + rows * cardH + Math.max(0, rows - 1) * gap + margin;
     const ctx = canvas.getContext("2d");
+    ctx.textBaseline = "alphabetic";
     ctx.fillStyle = "#f4f0e6";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = "#235b47";
@@ -1033,12 +1049,34 @@
     ctx.font = "18px sans-serif";
     ctx.fillText(new Date().toLocaleDateString("ja-JP"), canvas.width - 200, 118);
 
+    // 大賞バンドを描画
+    if (awards) {
+      const awImgs = await Promise.all(awards.map((a) => loadImage(`${a.photo.url}?t=${token}`)));
+      ctx.fillStyle = "#8a5a00";
+      ctx.font = "700 26px sans-serif";
+      ctx.fillText("🏅 みんなの大賞", margin, headerH + 40);
+      const awW = (canvas.width - margin * 2 - gap) / 2;
+      const awTop = headerH + 56;
+      awards.forEach((a, i) => {
+        const ax = margin + i * (awW + gap);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(ax, awTop, awW, awCardH);
+        drawCover(ctx, awImgs[i], ax, awTop, awW, awImgH);
+        ctx.fillStyle = "#17201d";
+        ctx.font = "700 24px sans-serif";
+        ctx.fillText(a.title, ax + 16, awTop + awImgH + 34);
+        ctx.fillStyle = "#65716c";
+        ctx.font = "17px sans-serif";
+        ctx.fillText(`${a.photo.nickname}／${a.photo.spotName}　${a.caption}`.slice(0, 24), ax + 16, awTop + awImgH + 62);
+      });
+    }
+
     const images = await Promise.all(state.album.map((item) => loadImage(item.photoUrl)));
     state.album.forEach((item, index) => {
       const col = index % cols;
       const row = Math.floor(index / cols);
       const x = margin + col * (cardW + gap);
-      const y = headerH + margin + row * (cardH + gap);
+      const y = headerH + awBandH + margin + row * (cardH + gap);
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(x, y, cardW, cardH);
       drawCover(ctx, images[index], x, y, cardW, 310);
