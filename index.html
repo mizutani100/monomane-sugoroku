@@ -425,6 +425,31 @@
   }
 });
 <script>
+
+  <!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>カスタム音楽プレイヤー</title>
+</head>
+<body>
+
+    <h2>カスタムコントロール</h2>
+    <button onclick="playAudio()">再生</button>
+    <button onclick="pauseAudio()">一時停止</button>
+
+    <script>
+        // 音声オブジェクトを作成
+        const audio = new Audio('ネオン暴走(1).mp3');
+
+        function playAudio() {
+            audio.play();
+        }
+
+        function pauseAudio() {
+            audio.pause();
+        }
+
     // 音声ファイルの読み込み
     const bgm = new Audio('bacteria.mp3'); // ファイルパスを指定
 
