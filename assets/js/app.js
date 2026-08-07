@@ -86,13 +86,17 @@
 
   /** 効果音エンジン（Web Audio APIで合成。外部ファイル不要でオフラインでも鳴る） */
   const sfx = (() => {
-    let ctx = null;
+    let ctx = null, master = null;
+    const MASTER = 1.9; // 効果音全体の底上げ倍率
     let muted = localStorage.getItem("monomaneMuted") === "1";
     const ensure = () => {
       if (!ctx) {
         const AC = window.AudioContext || window.webkitAudioContext;
         if (!AC) return null;
         try { ctx = new AC(); } catch { return null; }
+        master = ctx.createGain();
+        master.gain.value = MASTER;
+        master.connect(ctx.destination);
       }
       if (ctx.state === "suspended") ctx.resume().catch(() => {});
       return ctx;
@@ -110,7 +114,7 @@
       g.gain.setValueAtTime(0.0001, t0);
       g.gain.exponentialRampToValueAtTime(gain, t0 + 0.012);
       g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-      osc.connect(g).connect(ac.destination);
+      osc.connect(g).connect(master);
       osc.start(t0);
       osc.stop(t0 + dur + 0.03);
     }
@@ -128,7 +132,7 @@
       const g = ac.createGain();
       g.gain.setValueAtTime(gain, t0);
       g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-      src.connect(g).connect(ac.destination);
+      src.connect(g).connect(master);
       src.start(t0);
     }
     const chord = (freqs, start, dur, opts) => freqs.forEach((f) => tone(f, start, dur, opts));
