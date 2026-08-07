@@ -5,7 +5,7 @@ set -e
 BASE="http://localhost:8080/api"
 J() { python3 -c "import sys,json; d=json.load(sys.stdin); print(d$1)"; }
 
-echo "== 1. 部屋作成（ホスト: みさと）"
+echo "== 1. 部屋作成（ホスト: しろT）"
 CREATE=$(curl -s -X POST "$BASE/rooms" -H "Content-Type: application/json" -d '{
   "nickname": "みさと", "icon": "🗿",
   "board": { "center": {"lat": 38.2601, "lon": 140.8824}, "radiusM": 1800,
@@ -18,7 +18,7 @@ CODE=$(echo "$CREATE" | J "['code']")
 HOST_TOKEN=$(echo "$CREATE" | J "['playerToken']")
 echo "部屋コード: $CODE"
 
-echo "== 2. 2人目が参加（ゲスト: ゆき）"
+echo "== 2. 2人目が参加（ゲスト: くろT）"
 JOIN=$(curl -s -X POST "$BASE/rooms/$CODE/join" -H "Content-Type: application/json" \
   -d '{"nickname": "ゆき", "icon": "📮"}')
 GUEST_TOKEN=$(echo "$JOIN" | J "['playerToken']")
