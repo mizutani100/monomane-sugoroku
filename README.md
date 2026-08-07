@@ -14,6 +14,13 @@
 
 ホーム画面に追加すればアプリのように起動できます（PWA対応）。
 
+## リンク・資料
+
+- 🎮 遊ぶ（本番）: <https://monomane-sugoroku.pages.dev>
+- 📦 リポジトリ: <https://github.com/mizutani100/monomane-sugoroku>
+- 📄 仕様書: [`docs/仕様書.md`](docs/仕様書.md)
+- 🖼️ 発表スライド: [`docs/20260807_旅すご_発表用スライド.pptx`](docs/20260807_旅すご_発表用スライド.pptx)
+
 ## 遊び方
 
 1. プロフィールタブでニックネームを決める
