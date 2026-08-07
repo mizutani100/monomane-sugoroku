@@ -1,5 +1,5 @@
 /**
- * 街のモノまねすごろく API（Cloudflare Pages Functions + D1 版）
+ * 旅すご API（Cloudflare Pages Functions + D1 版）
  *
  * 自前Apache版（api/index.php + api/lib.php）と同一仕様。
  * 違いは以下の2点のみ:
@@ -61,7 +61,7 @@ async function judgePhoto(env, bytes, spot) {
   const category = String(spot.category ?? '');
   const label = CATEGORY_LABELS[category] || String(spot.name ?? 'まちのもの');
   const prompt =
-    `あなたは「街のモノまねすごろく」という遊びの審査員です。` +
+    `あなたは「旅すご」という遊びの審査員です。` +
     `写真に写っている人が「${label}」のモノマネ（そっくりなポーズ・見た目）をどれくらい上手にできているかを採点してください。\n` +
     `次のJSONだけを1行で出力してください。説明文やコードブロックは書かないこと:\n` +
     `{"stars":<1〜5の整数>,"pole":<電柱が写っていればtrue、なければfalse>,"comment":"<子ども向けの短くて楽しい日本語の講評。30文字以内>"}\n` +

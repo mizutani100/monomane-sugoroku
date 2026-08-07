@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /**
- * 街のモノまねすごろく API ルーター（P1）
+ * 旅すご API ルーター（P1）
  *
  * エンドポイント:
  *   POST   /api/rooms                    部屋作成（ホスト）

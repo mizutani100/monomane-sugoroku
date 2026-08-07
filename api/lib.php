@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /**
- * 街のモノまねすごろく API 共通ライブラリ（P1）
+ * 旅すご API 共通ライブラリ（P1）
  * DB: SQLite1ファイル。api/data/ 配下（.htaccessで外部アクセス拒否）
  */
 
