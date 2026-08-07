@@ -2366,7 +2366,12 @@
   }
 
   updateRadiusLabel(Number($("radius-range").value));
-  setCenter(L.latLng(CONFIG.initialCenter[0], CONFIG.initialCenter[1]));
+  setCenter(L.latLng(CONFIG.initialCenter[0], CONFIG.initialCenter[1])); // 現在地取得までの仮の中心
+  // 起動時に現在地を取得できたら、現在地マーカーと中心マーカーを同じ場所（現在地）に合わせる
+  currentPosition().then((position) => {
+    const here = showCurrentPosition(position, false);
+    setCenter(L.latLng(here[0], here[1]), true);
+  }).catch(() => {});
   loadDefaultData();
   if (localStorage.getItem("monomaneSafetyAccepted") !== "1") showDialog($("safety-dialog"));
 })();
