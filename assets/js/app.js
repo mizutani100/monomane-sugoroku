@@ -152,6 +152,8 @@
       star() { tone(1046, 0, 0.09, { type: "triangle", gain: 0.2 }); tone(1568, 0.08, 0.14, { type: "triangle", gain: 0.18 }); },
       win() { [523, 659, 784, 1046, 1319].forEach((f, i) => tone(f, i * 0.12, 0.38, { type: "triangle", gain: 0.22 })); noise(0.05, 0.4, 0.14); },
       pop() { tone(600, 0, 0.08, { type: "sine", gain: 0.2, glideTo: 1000 }); },
+      hop() { tone(520, 0, 0.1, { type: "triangle", gain: 0.22, glideTo: 900 }); }, // コマが1マス跳ねる音
+
       tick() { tone(680, 0, 0.035, { type: "square", gain: 0.07 }); }, // 全ボタン共通の短いクリック音
       error() { tone(320, 0, 0.2, { type: "sawtooth", gain: 0.18, glideTo: 150 }); }
     };
@@ -727,6 +729,7 @@
       state.position = i;
       markRouteProgress();
       hopMarker(i);
+      sfx.hop(); // 1マス進むごとに跳ねる効果音
       const spot = state.route[i];
       map.panTo([spot.lat, spot.lon], { animate: true, duration: 0.3 });
       const remaining = to - i;
