@@ -1,6 +1,6 @@
 {
-  "name": "街のモノまねすごろく",
-  "short_name": "モノまね",
+  "name": "旅すご",
+  "short_name": "旅すご",
   "description": "道端の構造物になりきる位置情報すごろくゲーム",
   "start_url": "./",
   "scope": "./",

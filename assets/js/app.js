@@ -1042,7 +1042,7 @@
     ctx.fillRect(0, 0, canvas.width, headerH);
     ctx.fillStyle = "#ffffff";
     ctx.font = "700 44px sans-serif";
-    ctx.fillText("街のモノまねすごろく", margin, 66);
+    ctx.fillText("旅すご", margin, 66);
     ctx.font = "700 30px sans-serif";
     const name = $("player-name").value.trim() || "挑戦者";
     ctx.fillText(`${name}　総合 ${state.score}点`, margin, 118);
@@ -2295,7 +2295,7 @@
     const link = `${location.origin}${location.pathname}?join=${code}`;
     if (navigator.share) {
       try {
-        await navigator.share({ title: "街のモノまねすごろく", text: `部屋 ${code} に参加してね！`, url: link });
+        await navigator.share({ title: "旅すご", text: `部屋 ${code} に参加してね！`, url: link });
         return;
       } catch (error) {
         if (error && error.name === "AbortError") return;
