@@ -2136,14 +2136,26 @@
 
   // --- ボタン結線 ---
   $("btn-goto-profile").addEventListener("click", () => switchTab("profile"));
-  $("btn-open-setup").addEventListener("click", () => {
+  $("btn-open-setup").addEventListener("click", async () => {
     switchTab("map");
     $("no-room-panel").classList.add("hidden");
     $("game-panel").classList.add("hidden");
     $("setup-panel").classList.remove("hidden");
     $("player-name").value = profileNickname();
     setTimeout(fitCenterCircle, 80); // パネル表示後のレイアウト確定を待って円を映す
-    toast("地図をタップして中心地点を選んでください。スライダーで探索半径を調整できます。", 3500);
+
+    // 中心マーカーの初期位置を現在地にする（取得できないときは地図タップで選んでもらう）
+    $("setup-status").textContent = "現在地を取得中…";
+    try {
+      const position = await currentPosition();
+      const here = showCurrentPosition(position, false);
+      setCenter(L.latLng(here[0], here[1]), true);
+      fitCenterCircle();
+      toast("現在地を盤面の中心にしました。地図タップやスライダーで調整できます。", 3500);
+    } catch (error) {
+      $("setup-status").textContent = "地図をタップして中心地点を選んでください。";
+      toast("地図をタップして中心地点を選んでください。スライダーで探索半径を調整できます。", 3500);
+    }
   });
   $("btn-join-room").addEventListener("click", joinRoom);
   $("btn-leave-room").addEventListener("click", leaveRoom);
