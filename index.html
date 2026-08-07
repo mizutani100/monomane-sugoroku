@@ -248,6 +248,27 @@
     </form>
   </dialog>
 
+  <dialog id="onboarding-dialog" class="app-dialog">
+    <form method="dialog" class="dialog-card onboarding-card">
+      <button class="dialog-close" value="cancel" aria-label="閉じる">×</button>
+      <h2 class="onboarding-title">ようこそ！旅すご</h2>
+      <p class="onboarding-lead">道端のモノになりきって写真を撮る、位置情報すごろく。<br>まずはどちらか選んでね。</p>
+      <div class="onboarding-choices">
+        <button id="onboard-create" class="onboarding-btn" type="button">
+          <span class="onboarding-emoji">🗺️</span>
+          <span class="onboarding-btn-title">マップを作る</span>
+          <span class="onboarding-btn-sub">自分が主催して盤面を生成</span>
+        </button>
+        <button id="onboard-join" class="onboarding-btn" type="button">
+          <span class="onboarding-emoji">🚪</span>
+          <span class="onboarding-btn-title">部屋に入る</span>
+          <span class="onboarding-btn-sub">コードをもらって参加</span>
+        </button>
+      </div>
+      <p class="fine-print onboarding-skip-note">あとで下の「マップ」「プロフィール」からも始められます。</p>
+    </form>
+  </dialog>
+
   <dialog id="mission-dialog" class="app-dialog">
     <form method="dialog" class="dialog-card mission-card" id="mission-form">
       <button class="dialog-close" value="cancel" aria-label="閉じる">×</button>

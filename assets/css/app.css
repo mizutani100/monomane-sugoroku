@@ -782,3 +782,38 @@ label.button.file-button {
   .app-header h1, .score-chip, .tab-button.active .tab-icon { animation: none; }
   .ai-verdict.judging .ai-badge { animation: none; }
 }
+
+/* ===== 初回オンボーディング ===== */
+.onboarding-card { text-align: center; }
+.onboarding-title {
+  font-size: 24px;
+  font-weight: 900;
+  margin: 4px 0 8px;
+  background: linear-gradient(90deg, #ff008c, #00e5ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.onboarding-lead { color: var(--muted); font-size: 14px; margin: 0 0 18px; line-height: 1.6; }
+.onboarding-choices { display: flex; gap: 12px; }
+.onboarding-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 22px 10px;
+  border-radius: 18px;
+  border: 2px solid #7c3aed;
+  background: linear-gradient(160deg, #241d3f, #2a0b3a);
+  color: #fff;
+  cursor: pointer;
+  transition: transform .1s ease, box-shadow .1s ease;
+}
+.onboarding-btn:active { transform: scale(.95); }
+#onboard-create { border-color: #ff3ea5; background: linear-gradient(160deg, #3a1030, #2a0b3a); box-shadow: 0 0 14px rgba(255, 62, 165, .45); }
+#onboard-join { border-color: #29b6ff; background: linear-gradient(160deg, #0e2b3a, #10233a); box-shadow: 0 0 14px rgba(41, 182, 255, .45); }
+.onboarding-emoji { font-size: 42px; line-height: 1; }
+.onboarding-btn-title { font-size: 17px; font-weight: 900; }
+.onboarding-btn-sub { font-size: 12px; color: #d5d0ec; }
+.onboarding-skip-note { margin-top: 16px; text-align: center; }

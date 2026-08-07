@@ -84,6 +84,9 @@
   // 効果音が鳴る瞬間にBGMを一時的に下げる（ダッキング）ためのフック。bgm定義後に実体を差し込む
   let duckBgm = () => {};
 
+  // 招待リンク（?join=）で開いたかどうか。初回オンボーディングの出し分けに使う
+  let pendingJoinFlow = false;
+
   /** 効果音エンジン（Web Audio APIで合成。外部ファイル不要でオフラインでも鳴る） */
   const sfx = (() => {
     let ctx = null, master = null;
@@ -1348,6 +1351,8 @@
     $("btn-safety-ok").disabled = !event.target.checked;
   });
   $("btn-safety-ok").addEventListener("click", () => localStorage.setItem("monomaneSafetyAccepted", "1"));
+  // 安全ダイアログを閉じた後に、初回オンボーディングを出す（条件を満たすときだけ）
+  $("safety-dialog").addEventListener("close", () => maybeShowOnboarding());
 
   $("btn-sources").addEventListener("click", () => showDialog($("sources-dialog")));
   $("score-chip").addEventListener("click", () => showDialog($("sources-dialog")));
@@ -2203,7 +2208,7 @@
 
   // --- ボタン結線 ---
   $("btn-goto-profile").addEventListener("click", () => switchTab("profile"));
-  $("btn-open-setup").addEventListener("click", async () => {
+  async function openSetup() {
     switchTab("map");
     $("no-room-panel").classList.add("hidden");
     $("game-panel").classList.add("hidden");
@@ -2223,6 +2228,22 @@
       $("setup-status").textContent = "地図をタップして中心地点を選んでください。";
       toast("地図をタップして中心地点を選んでください。スライダーで探索半径を調整できます。", 3500);
     }
+  }
+  $("btn-open-setup").addEventListener("click", openSetup);
+
+  // ===== 初回オンボーディング（初見ユーザーに「作る／入る」の2択を大きく出す） =====
+  function maybeShowOnboarding() {
+    if (localStorage.getItem("monomaneOnboarded") === "1") return;
+    if (localStorage.getItem("monomaneSession")) return;   // すでに部屋に入っている
+    if (pendingJoinFlow) return;                            // 招待リンク経由は参加画面へ誘導済み
+    showDialog($("onboarding-dialog"));
+  }
+  $("onboarding-dialog").addEventListener("close", () => localStorage.setItem("monomaneOnboarded", "1"));
+  $("onboard-create").addEventListener("click", () => { closeDialog($("onboarding-dialog")); openSetup(); });
+  $("onboard-join").addEventListener("click", () => {
+    closeDialog($("onboarding-dialog"));
+    switchTab("profile");
+    setTimeout(() => $("join-code").focus(), 200);
   });
   $("btn-join-room").addEventListener("click", joinRoom);
   $("btn-leave-room").addEventListener("click", leaveRoom);
@@ -2362,6 +2383,7 @@
     const code = joinParam.toUpperCase();
     $("join-code").value = code;
     if (!localStorage.getItem("monomaneSession")) {
+      pendingJoinFlow = true; // 招待リンク経由なので初回オンボーディングは出さない
       switchTab("profile");
       toast(`招待コード ${code} が入りました。ニックネームを決めて「参加する」を押してください。`, 5500);
     }
@@ -2376,5 +2398,9 @@
     setCenter(L.latLng(here[0], here[1]), true);
   }).catch(() => {});
   loadDefaultData();
-  if (localStorage.getItem("monomaneSafetyAccepted") !== "1") showDialog($("safety-dialog"));
+  if (localStorage.getItem("monomaneSafetyAccepted") !== "1") {
+    showDialog($("safety-dialog")); // 閉じたあとに maybeShowOnboarding() が走る
+  } else {
+    maybeShowOnboarding();
+  }
 })();
