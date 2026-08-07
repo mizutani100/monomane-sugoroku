@@ -1091,7 +1091,7 @@
 
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
     if (!blob) return false;
-    const filename = `monomane-sugoroku-${new Date().toISOString().slice(0, 10)}.png`;
+    const filename = `tabisugo-${new Date().toISOString().slice(0, 10)}.png`;
     return saveImage(blob, filename);
   }
 
@@ -1104,7 +1104,7 @@
     const file = new File([blob], filename, { type: "image/png" });
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
       try {
-        await navigator.share({ files: [file], title: "モノまね旅のしおり" });
+        await navigator.share({ files: [file], title: "旅すごのしおり" });
         return true;
       } catch (error) {
         if (error && error.name === "AbortError") return false; // ユーザーがキャンセルした

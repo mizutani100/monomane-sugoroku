@@ -7,7 +7,7 @@
 
 # タスク
 
-PHP + SQLiteで動いている「街のモノまねすごろく」のバックエンドを、Cloudflare Pages Functions + D1 に移植する。フロントエンド（HTML/CSS/JS）は原則そのまま流用し、Cloudflare Pagesにデプロイして誰でもURLでアクセスできる状態にする。
+PHP + SQLiteで動いている「旅すご」のバックエンドを、Cloudflare Pages Functions + D1 に移植する。フロントエンド（HTML/CSS/JS）は原則そのまま流用し、Cloudflare Pagesにデプロイして誰でもURLでアクセスできる状態にする。
 
 # 成果物
 
