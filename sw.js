@@ -5,7 +5,7 @@
  *  - 地図タイルと被写体データはネットワーク優先＋キャッシュ退避（歩いた場所は再訪できる）
  *  - APIは常にネットワーク。キャッシュしない（採点・部屋の状態が古くなるため）
  */
-const VERSION = "v5.9.1";
+const VERSION = "v5.9.2";
 const SHELL_CACHE = `monomane-shell-${VERSION}`;
 const RUNTIME_CACHE = `monomane-runtime-${VERSION}`;
 
@@ -54,6 +54,9 @@ self.addEventListener("fetch", (event) => {
 
   // API・写真は常に最新を取りに行く（キャッシュしない）
   if (url.pathname.includes("/api/")) return;
+
+  // BGMなどの音声はSWを介さない（<audio>のRangeリクエストはCache APIと相性が悪いため素通し）
+  if (url.pathname.endsWith(".mp3")) return;
 
   // 地図タイル・被写体データ: ネットワーク優先、失敗時キャッシュ
   const isTile = url.hostname.includes("basemaps.cartocdn.com") || url.hostname.includes("tile.openstreetmap.org");

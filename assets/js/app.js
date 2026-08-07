@@ -148,97 +148,33 @@
     };
   })();
 
-  /** BGMエンジン（Web Audioで合成する跳ねるチップチューン。外部音源不要・著作権フリー・オフライン可） */
+  /** BGMエンジン（チームメイト制作の楽曲 assets/audio/bgm.mp3 をループ再生する） */
   const bgm = (() => {
-    let ctx = null, master = null, timer = null, step = 0, playing = false, hatBuf = null;
-    const N = {
-      C4: 261.63, D4: 293.66, E4: 329.63, F4: 349.23, G4: 392.00, A4: 440.00, B4: 493.88,
-      C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46, G5: 783.99, A5: 880.00
-    };
-    // 8分音符32ステップ（4小節 C-G-Am-F）の陽気で跳ねるメロディ（0は休符）
-    const MELODY = [
-      "G4", "E5", "C5", "E5", "G5", "E5", "C5", 0,
-      "G4", "D5", "B4", "D5", "G5", "D5", "B4", 0,
-      "A4", "E5", "C5", "E5", "A5", "E5", "C5", 0,
-      "F4", "C5", "A4", "C5", "F5", "C5", "A4", 0
-    ];
-    const BASS = [130.81, 98.00, 110.00, 87.31]; // C3 G2 A2 F2（弾むベース）
-    const bpm = 142, beatMs = 60000 / bpm / 2;   // 速めの8分音符でノリよく
+    const SRC = "assets/audio/bgm.mp3";
+    let audio = null, playing = false;
     const ensure = () => {
-      if (!ctx) {
-        const AC = window.AudioContext || window.webkitAudioContext;
-        if (!AC) return null;
-        try { ctx = new AC(); } catch { return null; }
-        master = ctx.createGain();
-        master.gain.value = 0.07;
-        master.connect(ctx.destination);
-        hatBuf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.05), ctx.sampleRate);
-        const d = hatBuf.getChannelData(0);
-        for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
+      if (!audio) {
+        audio = new Audio(SRC);
+        audio.loop = true;
+        audio.volume = 0.4;
+        audio.preload = "none";
+        audio.addEventListener("playing", () => { playing = true; updateBgmIcon(); });
+        audio.addEventListener("pause", () => { playing = false; updateBgmIcon(); });
       }
-      if (ctx.state === "suspended") ctx.resume().catch(() => {});
-      return ctx;
+      return audio;
     };
-    function osc(freq, dur, type, gain) {
-      const t = ctx.currentTime;
-      const o = ctx.createOscillator();
-      const g = ctx.createGain();
-      o.type = type;
-      o.frequency.value = freq;
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(gain, t + 0.008);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      o.connect(g).connect(master);
-      o.start(t);
-      o.stop(t + dur + 0.03);
-    }
-    function kick() {
-      const t = ctx.currentTime;
-      const o = ctx.createOscillator();
-      const g = ctx.createGain();
-      o.type = "sine";
-      o.frequency.setValueAtTime(150, t);
-      o.frequency.exponentialRampToValueAtTime(50, t + 0.12);
-      g.gain.setValueAtTime(0.7, t);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
-      o.connect(g).connect(master);
-      o.start(t);
-      o.stop(t + 0.2);
-    }
-    function hat() {
-      if (!hatBuf) return;
-      const t = ctx.currentTime;
-      const s = ctx.createBufferSource();
-      s.buffer = hatBuf;
-      const g = ctx.createGain();
-      g.gain.setValueAtTime(0.16, t);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.04);
-      s.connect(g).connect(master);
-      s.start(t);
-    }
-    function tick() {
-      const bar = Math.floor(step / 8) % 4;
-      const inBar = step % 8;
-      const m = MELODY[step % 32];
-      if (m && N[m]) osc(N[m], beatMs / 1000 * 0.85, "square", 0.16); // 8bit風リード
-      if (inBar % 4 === 0) { osc(BASS[bar], beatMs / 1000 * 1.5, "square", 0.26); kick(); }
-      if (inBar % 2 === 1) hat(); // 裏拍のハイハットでノリを出す
-      step = (step + 1) % 32;
-    }
     return {
       isPlaying: () => playing,
       start() {
-        if (playing || !ensure()) return false;
-        step = 0;
-        tick();
-        timer = setInterval(tick, beatMs);
+        const a = ensure();
         playing = true;
         localStorage.setItem("monomaneBgm", "1");
+        const p = a.play();
+        if (p && p.catch) p.catch(() => { playing = false; }); // 自動再生ブロック時は次のユーザー操作で復帰
         return true;
       },
       stop() {
-        if (timer) clearInterval(timer);
-        timer = null;
+        if (audio) audio.pause();
         playing = false;
         localStorage.setItem("monomaneBgm", "0");
       },
