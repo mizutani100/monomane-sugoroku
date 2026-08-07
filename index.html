@@ -367,37 +367,63 @@
   <script src="assets/js/app.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
-      const quizList = [
-        { question: "【クイズ】宮城県の名物「ずんだ」の原料は何？\n1: えだまめ\n2: そらまめ", answer: ["1","えだまめ"] },
-        { question: "【クイズ】仙台藩の初代藩主はだれ？\n1: 伊達政宗\n2: 織田信長", answer: ["1","伊達政宗"] },
-        { question: "【クイズ】東北学院大学情報学部に現在設置されている学科はどれ\n1: 情報ネットワーク学科\n2: 情報工学科\n3: データサイエンス学科", answer: ["3","データサイエンス学科"] }
-      ];
+  const quizList = [
+    { 
+      question: "【クイズ】宮城県の名物「ずんだ」の原料は何？\n1: えだまめ\n2: そらまめ", 
+      answers: ["1", "えだまめ"],
+      points: 10 // ★獲得できる点数を設定
+    },
+    { 
+      question: "【クイズ】仙台藩の初代藩主はだれ？\n1: 伊達政宗\n2: 織田信長", 
+      answers: ["1", "伊達政宗"],
+      points: 10
+    },
+    { 
+      question: "【クイズ】東北学院大学情報学部に現在設置されている学科はどれ\n1: 情報ネットワーク学科\n2: 情報工学科\n3: データ...", 
+      answers: ["1", "情報ネットワーク学科"],
+      points: 10
+    }
+  ];
 
-      // 1回目のクイズが終わったかを管理する変数
-      let hasAnsweredQuiz = false;
+  // ★現在のスコアを管理する変数
+  let score = 0;
 
-      // 「送る」ボタンを取得
-      const submitBtn = document.getElementById('btn-submit-photo');
-      if (submitBtn) {
-        submitBtn.addEventListener('click', () => {
-          // まだクイズを出していない（最初の1回）場合のみ実行
-          if (!hasAnsweredQuiz) {
-            hasAnsweredQuiz = true;
+  // ★スコアの画面表示を更新する関数
+  const scoreChip = document.getElementById('score-chip');
+  const updateScoreDisplay = () => {
+    if (scoreChip) {
+      scoreChip.textContent = `現在の得点: ${score}点`;
+      scoreChip.setAttribute('aria-label', `現在の得点:${score}点`);
+    }
+  };
 
-            // 写真の送信完了ダイアログ等が出た後にクイズを表示するため、少し時間をずらす（1秒後）
-            setTimeout(() => {
-              const randomQuiz = quizList[Math.floor(Math.random() * quizList.length)];
-              const userAnswer = prompt(randomQuiz.question);
-              if (userAnswer === randomQuiz.answer) {
-                alert("🎉 正解！ボーナス獲得！");
-              } else if (userAnswer !== null) {
-                alert("❌ 不正解…！");
-              }
-            }, 1000);
+  let hasAnsweredQuiz = false;
+
+  const submitBtn = document.getElementById('btn-submit-photo');
+  if (submitBtn) {
+    submitBtn.addEventListener('click', () => {
+      if (!hasAnsweredQuiz) {
+        hasAnsweredQuiz = true;
+
+        setTimeout(() => {
+          const randomQuiz = quizList[Math.floor(Math.random() * quizList.length)];
+          const userAnswer = prompt(randomQuiz.question);
+          const cleanedAnswer = userAnswer?.trim();
+
+          if (cleanedAnswer && randomQuiz.answers.includes(cleanedAnswer)) {
+            // ★正解時にスコアを加算して表示を更新
+            score += randomQuiz.points;
+            updateScoreDisplay();
+
+            alert(`🎉 正解！ボーナス ${randomQuiz.points}点 獲得！（合計: ${score}点）`);
+          } else if (userAnswer !== null) {
+            alert("❌ 不正解...！");
           }
-        });
+        }, 1000);
       }
     });
+  }
+});
   </script>
 </body>
 </html>
