@@ -81,6 +81,9 @@
     toast.timer = setTimeout(() => el.classList.remove("show"), duration);
   }
 
+  // 効果音が鳴る瞬間にBGMを一時的に下げる（ダッキング）ためのフック。bgm定義後に実体を差し込む
+  let duckBgm = () => {};
+
   /** 効果音エンジン（Web Audio APIで合成。外部ファイル不要でオフラインでも鳴る） */
   const sfx = (() => {
     let ctx = null;
@@ -97,6 +100,7 @@
     function tone(freq, start, dur, { type = "sine", gain = 0.2, glideTo = null } = {}) {
       const ac = ensure();
       if (!ac || muted) return;
+      duckBgm(); // 効果音が鳴る間だけBGMを下げて埋もれさせない
       const t0 = ac.currentTime + start;
       const osc = ac.createOscillator();
       const g = ac.createGain();
@@ -113,6 +117,7 @@
     function noise(start, dur, gain = 0.2) {
       const ac = ensure();
       if (!ac || muted) return;
+      duckBgm();
       const t0 = ac.currentTime + start;
       const len = Math.max(1, Math.floor(ac.sampleRate * dur));
       const buf = ac.createBuffer(1, len, ac.sampleRate);
@@ -151,12 +156,14 @@
   /** BGMエンジン（チームメイト制作の楽曲 assets/audio/bgm.mp3 をループ再生する） */
   const bgm = (() => {
     const SRC = "assets/audio/bgm.mp3";
-    let audio = null, playing = false;
+    const BASE_VOL = 0.28;   // 効果音を邪魔しない控えめの基準音量
+    const DUCK_VOL = 0.06;   // 効果音が鳴る瞬間まで下げる音量
+    let audio = null, playing = false, rampTimer = null;
     const ensure = () => {
       if (!audio) {
         audio = new Audio(SRC);
         audio.loop = true;
-        audio.volume = 0.4;
+        audio.volume = BASE_VOL;
         audio.preload = "none";
         audio.addEventListener("playing", () => { playing = true; updateBgmIcon(); });
         audio.addEventListener("pause", () => { playing = false; updateBgmIcon(); });
@@ -167,6 +174,8 @@
       isPlaying: () => playing,
       start() {
         const a = ensure();
+        clearInterval(rampTimer);
+        a.volume = BASE_VOL;
         playing = true;
         localStorage.setItem("monomaneBgm", "1");
         const p = a.play();
@@ -175,13 +184,26 @@
       },
       stop() {
         if (audio) audio.pause();
+        clearInterval(rampTimer);
         playing = false;
         localStorage.setItem("monomaneBgm", "0");
       },
       toggle() { if (playing) { this.stop(); } else { this.start(); } return playing; },
-      wanted: () => localStorage.getItem("monomaneBgm") === "1"
+      wanted: () => localStorage.getItem("monomaneBgm") === "1",
+      // 効果音が鳴る瞬間だけBGMをすっと下げ、その後じわっと基準音量へ戻す（ダッキング）
+      duck() {
+        if (!audio || audio.paused) return;
+        clearInterval(rampTimer);
+        audio.volume = DUCK_VOL;
+        rampTimer = setInterval(() => {
+          const next = Math.min(BASE_VOL, audio.volume + 0.02);
+          audio.volume = next;
+          if (next >= BASE_VOL - 0.001) { audio.volume = BASE_VOL; clearInterval(rampTimer); }
+        }, 30); // 約0.3〜0.4秒かけて戻す
+      }
     };
   })();
+  duckBgm = () => bgm.duck(); // 効果音フックにBGMダッキングの実体を差し込む
 
   function showDialog(dialog) {
     if (!dialog.open) dialog.showModal();
