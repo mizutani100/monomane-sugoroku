@@ -17,7 +17,7 @@ assert_http() { # $1=期待 $2=実際 $3=説明
   if [ "$1" = "$2" ]; then ok "$3 (HTTP $2)"; else ng "$3 期待HTTP$1 実際HTTP$2"; fi
 }
 
-echo "== 準備: 部屋作成（ホスト: みさと）"
+echo "== 準備: 部屋作成（ホスト: しろT）"
 CREATE=$(curl -s -X POST "$BASE/rooms" -H "Content-Type: application/json" -d '{
   "nickname": "みさと", "icon": "🗿",
   "board": { "center": {"lat": 38.2601, "lon": 140.8824}, "radiusM": 1800,
@@ -53,7 +53,7 @@ assert_http 400 "$E1" "空ニックネームを拒否"
 E2=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE/rooms/$CODE/join" -H "Content-Type: application/json" -d '{"nickname":"あいうえおかきくけこさ"}')
 assert_http 400 "$E2" "11文字ニックネームを拒否"
 
-echo "== 2人目が参加（ゲスト: ゆき）"
+echo "== 2人目が参加（ゲスト: くろT）"
 JOIN=$(curl -s -X POST "$BASE/rooms/$CODE/join" -H "Content-Type: application/json" \
   -d '{"nickname": "ゆき", "icon": "📮"}')
 GUEST_TOKEN=$(echo "$JOIN" | J "['playerToken']")
