@@ -1,7 +1,7 @@
 {
   "name": "monomane-sugoroku",
   "version": "5.0.0",
-  "description": "街のモノまねすごろく（Cloudflare Pages Functions + D1 版）",
+  "description": "旅すご（Cloudflare Pages Functions + D1 版）",
   "private": true,
   "license": "MIT",
   "scripts": {

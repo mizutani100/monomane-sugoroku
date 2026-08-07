@@ -1,4 +1,4 @@
--- 街のモノまねすごろく D1 スキーマ（Cloudflare版）
+-- 旅すご D1 スキーマ（Cloudflare版）
 -- 自前Apache版（api/lib.php の migrate()）と同一構造だが、
 -- 写真はファイルではなく D1 の BLOB に保存する（file_path → photo_blob / public_path → public_blob）。
 -- 1行あたり最大2MB・DB最大500MBのD1無料枠に収まるよう、写真はクライアント側で
