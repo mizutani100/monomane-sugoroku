@@ -1148,28 +1148,6 @@
     if (!sources.size) list.textContent = "データ未読込";
   }
 
-  async function importGeoJSON(file) {
-    if (!file) return;
-    if (file.size > CONFIG.maxImportBytes) {
-      toast(`ファイルが大きすぎます（上限 ${Math.round(CONFIG.maxImportBytes / 1024 / 1024)}MB）。`, 4500);
-      return;
-    }
-    try {
-      const data = JSON.parse(await file.text());
-      const spots = parseGeoJSON(data, file.name);
-      if (!spots.length) throw new Error("対応カテゴリのPoint地物がありません。category属性を確認してください。");
-      state.allSpots.push(...spots);
-      state.importedSources += 1;
-      updateDataSummary();
-      toast(`${spots.length.toLocaleString()}地点を追加しました。`);
-    } catch (error) {
-      console.error(error);
-      toast(`GeoJSONを追加できません：${error.message}`, 5000);
-    } finally {
-      $("geojson-input").value = "";
-    }
-  }
-
   function resetToSetup() {
     closeDialog($("result-dialog"));
     closeDialog($("mission-dialog"));
@@ -1224,7 +1202,6 @@
     }
   });
 
-  $("geojson-input").addEventListener("change", (event) => importGeoJSON(event.target.files[0]));
   $("btn-generate").addEventListener("click", generateRoute);
   $("btn-dice").addEventListener("click", rollDice);
   $("btn-arrival").addEventListener("click", checkArrival);
