@@ -424,6 +424,20 @@
     });
   }
 });
+<script>
+    // 音声ファイルの読み込み
+    const bgm = new Audio('bacteria.mp3'); // ファイルパスを指定
+
+    // BGM用の設定
+    bgm.loop = true;   // ループ再生を有効化
+    bgm.volume = 0.5;  // 音量を設定 (0.0 〜 1.0)
+
+    // 再生関数
+    function startBGM() {
+      bgm.play().catch(error => {
+        console.log("自動再生がブロックされました。ユーザー操作が必要です:", error);
+      });
+    }    
   </script>
 </body>
 </html>
